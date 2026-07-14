@@ -39,10 +39,12 @@ class BookTextRendererTest {
 
     @Test
     void visiblePageHeadingsCanIncludeFirstPageAndTotalPages() {
-        ExportSettings settings = new ExportSettings(
-                Path.of("."), "%title%", false, 96,
-                true, "=== Page %pageNumber% of %pages% ===", true, "",
-                false, ColorMode.STRIP, 10, false
+        ExportSettings settings = settings(
+                false,
+                "=== Page %pageNumber% of %pages% ===",
+                true,
+                "",
+                ColorMode.STRIP
         );
 
         String rendered = BookTextRenderer.render(
@@ -60,10 +62,36 @@ class BookTextRendererTest {
     }
 
     private static ExportSettings cmiSettings() {
+        return settings(true, "<NextPage>", false, "<AutoPage>", ColorMode.CMI);
+    }
+
+    private static ExportSettings settings(
+            boolean lowercaseFilenames,
+            String paginationMarkup,
+            boolean paginationOnFirstPage,
+            String cmiDocumentHeader,
+            ColorMode colorMode
+    ) {
         return new ExportSettings(
-                Path.of("."), "%title%", true, 96,
-                true, "<NextPage>", false, "<AutoPage>",
-                false, ColorMode.CMI, 10, false
+                3,
+                false,
+                WorkflowMode.STAGED,
+                Path.of("staging"),
+                Path.of("published"),
+                Path.of("archive"),
+                Path.of("backups"),
+                PublishCollisionMode.FAIL,
+                "%title%",
+                lowercaseFilenames,
+                96,
+                true,
+                paginationMarkup,
+                paginationOnFirstPage,
+                cmiDocumentHeader,
+                false,
+                colorMode,
+                10,
+                false
         );
     }
 }

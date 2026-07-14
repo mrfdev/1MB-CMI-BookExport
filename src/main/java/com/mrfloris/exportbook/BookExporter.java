@@ -5,36 +5,37 @@ import org.bukkit.inventory.ItemStack;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /** Snapshots, renders, and writes complete collision-safe book exports. */
 final class BookExporter {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ROOT);
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH-mm-ss", Locale.ROOT);
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.ROOT);
-    private static final int MAXIMUM_COLLISION_ATTEMPTS = 10_000;
     private static final Pattern FILENAME_PLACEHOLDER = Pattern.compile(
             "%(?:title|book_title|author|player|uuid|date|time|timestamp|pages)%"
     );
 
     private final ExportBookPlugin plugin;
+    private final Clock clock;
 
     BookExporter(ExportBookPlugin plugin) {
+        this(plugin, Clock.systemDefaultZone());
+    }
+
+    BookExporter(ExportBookPlugin plugin, Clock clock) {
         this.plugin = plugin;
+        this.clock = clock;
     }
 
     ExportPreview preview(Player player, String requestedTitle) throws BookExportException {
@@ -54,7 +55,7 @@ final class BookExporter {
         }
 
         String resolvedTitle = resolveTitle(book, requestedTitle);
-        LocalDateTime exportedAt = LocalDateTime.now();
+        LocalDateTime exportedAt = LocalDateTime.now(clock);
         Map<String, String> placeholders = filenamePlaceholders(player, book, resolvedTitle, exportedAt);
         ExportSettings settings = plugin.settings();
         String templatedName = replacePlaceholders(settings.filenameFormat(), placeholders);
@@ -73,17 +74,34 @@ final class BookExporter {
     }
 
     ExportResult export(Player player, String requestedTitle) throws BookExportException {
+        return write(player, requestedTitle, false);
+    }
+
+    ExportResult stage(Player player, String requestedTitle) throws BookExportException {
+        return write(player, requestedTitle, true);
+    }
+
+    private ExportResult write(Player player, String requestedTitle, boolean forceStage)
+            throws BookExportException {
         ExportPreview preview = preview(player, requestedTitle);
         ExportSettings settings = plugin.settings();
-        Path path = writeUnique(
-                settings.exportDirectory(),
-                preview.filenameBase(),
-                preview.content(),
-                settings.maximumFilenameLength()
-        );
+        FileScope scope = settings.exportScope(forceStage);
+        Path path;
+        try {
+            path = BookFileStore.writeUnique(
+                    settings.exportDestination(forceStage),
+                    preview.filenameBase(),
+                    preview.content(),
+                    settings.maximumFilenameLength()
+            );
+        } catch (IOException exception) {
+            plugin.getLogger().log(Level.SEVERE, "Unable to write a BookExport " + scope.key() + " file.", exception);
+            throw new BookExportException("Unable to write the " + scope.key() + " file. Check the server log.", exception);
+        }
 
         if (settings.debugLogging()) {
-            plugin.getLogger().info(() -> "Exported " + path.getFileName()
+            plugin.getLogger().info(() -> (scope == FileScope.STAGED ? "Staged " : "Published directly ")
+                    + path.getFileName()
                     + " for " + player.getName()
                     + " (pages=" + preview.book().pageCount()
                     + ", utf16Units=" + preview.book().utf16Units()
@@ -91,26 +109,56 @@ final class BookExporter {
         }
         return new ExportResult(
                 path,
+                scope,
                 preview.book().pageCount(),
                 preview.book().utf16Units(),
                 preview.utf8Bytes()
         );
     }
 
-    List<String> listExports() throws BookExportException {
-        Path directory = plugin.settings().exportDirectory();
-        try (Stream<Path> paths = Files.list(directory)) {
-            return paths
-                    .filter(Files::isRegularFile)
-                    .map(Path::getFileName)
-                    .map(Path::toString)
-                    .filter(name -> name.toLowerCase(Locale.ROOT).endsWith(".txt"))
-                    .sorted(String.CASE_INSENSITIVE_ORDER)
-                    .toList();
+    List<String> listFiles(FileScope scope) throws BookExportException {
+        Path directory = scope.directory(plugin.settings());
+        try {
+            return BookFileStore.listTextFiles(directory);
         } catch (IOException exception) {
-            plugin.getLogger().log(Level.SEVERE, "Unable to list the BookExport output directory.", exception);
-            throw new BookExportException("Unable to list exported files. Check the server log.", exception);
+            plugin.getLogger().log(Level.SEVERE, "Unable to list BookExport " + scope.key() + " files.", exception);
+            throw new BookExportException("Unable to list " + scope.displayName() + ". Check the server log.", exception);
         }
+    }
+
+    PublishResult publish(
+            String stagedFilename,
+            PublishCollisionMode collisionMode,
+            String actor
+    ) throws BookExportException {
+        ExportSettings settings = plugin.settings();
+        PublishResult result;
+        try {
+            result = BookFileStore.publish(
+                    settings.stagingDirectory(),
+                    settings.publishedDirectory(),
+                    settings.archiveDirectory(),
+                    settings.backupDirectory(),
+                    stagedFilename,
+                    collisionMode,
+                    settings.maximumFilenameLength(),
+                    clock
+            );
+        } catch (IOException exception) {
+            plugin.getLogger().log(Level.SEVERE, "Unable to publish staged BookExport file.", exception);
+            throw new BookExportException("Unable to publish the staged file. Check the server log.", exception);
+        }
+
+        plugin.getLogger().info(() -> "Published staged file " + result.stagedPath().getFileName()
+                + " as " + result.publishedPath().getFileName()
+                + " by " + actor
+                + " (collisionMode=" + collisionMode.key()
+                + ", backup=" + filenameOrNone(result.backupPath())
+                + ", archive=" + filenameOrNone(result.archivedPath()) + ')');
+        if (result.hasArchiveWarning()) {
+            plugin.getLogger().warning(result.archiveWarning());
+        }
+        return result;
     }
 
     private String resolveTitle(BookSnapshot book, String requestedTitle) throws BookExportException {
@@ -142,73 +190,6 @@ final class BookExporter {
         return values;
     }
 
-    private Path writeUnique(
-            Path directory,
-            String baseName,
-            String content,
-            int maximumFilenameLength
-    ) throws BookExportException {
-        try {
-            Files.createDirectories(directory);
-        } catch (IOException exception) {
-            plugin.getLogger().log(Level.SEVERE, "Unable to create the BookExport output directory.", exception);
-            throw new BookExportException("Unable to create the export directory. Check the server log.", exception);
-        }
-
-        Set<String> existingNames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        try (Stream<Path> paths = Files.list(directory)) {
-            paths.map(Path::getFileName).map(Path::toString).forEach(existingNames::add);
-        } catch (IOException exception) {
-            plugin.getLogger().log(Level.SEVERE, "Unable to inspect the BookExport output directory.", exception);
-            throw new BookExportException("Unable to inspect the export directory. Check the server log.", exception);
-        }
-
-        Path temporaryFile;
-        try {
-            temporaryFile = Files.createTempFile(directory, ".bookexport-", ".tmp");
-            Files.writeString(temporaryFile, content, StandardCharsets.UTF_8);
-        } catch (IOException exception) {
-            plugin.getLogger().log(Level.SEVERE, "Unable to stage a complete BookExport file.", exception);
-            throw new BookExportException("Unable to write the export. Check the server log.", exception);
-        }
-
-        try {
-            for (int counter = 0; counter < MAXIMUM_COLLISION_ATTEMPTS; counter++) {
-                String suffix = counter == 0 ? "" : "_" + counter;
-                String boundedBase = FilenameSanitizer.appendCollisionSuffix(
-                        baseName,
-                        suffix,
-                        maximumFilenameLength
-                );
-                String fileName = boundedBase + ".txt";
-                if (existingNames.contains(fileName)) {
-                    continue;
-                }
-
-                Path candidate = directory.resolve(fileName).normalize();
-                if (!candidate.getParent().equals(directory.normalize())) {
-                    throw new BookExportException("The generated filename left the export directory.");
-                }
-                try {
-                    Files.move(temporaryFile, candidate);
-                    return candidate;
-                } catch (FileAlreadyExistsException ignored) {
-                    existingNames.add(fileName);
-                } catch (IOException exception) {
-                    plugin.getLogger().log(Level.SEVERE, "Unable to publish book export " + fileName, exception);
-                    throw new BookExportException("Unable to write the export. Check the server log.", exception);
-                }
-            }
-            throw new BookExportException("Too many files already use this title. Choose a different title.");
-        } finally {
-            try {
-                Files.deleteIfExists(temporaryFile);
-            } catch (IOException exception) {
-                plugin.getLogger().log(Level.WARNING, "Unable to remove a staged BookExport temporary file.", exception);
-            }
-        }
-    }
-
     static String replacePlaceholders(String template, Map<String, String> values) {
         Matcher matcher = FILENAME_PLACEHOLDER.matcher(template);
         StringBuilder output = new StringBuilder(template.length());
@@ -218,6 +199,10 @@ final class BookExporter {
         }
         matcher.appendTail(output);
         return output.toString();
+    }
+
+    private static String filenameOrNone(Path path) {
+        return path == null ? "none" : path.getFileName().toString();
     }
 
 }

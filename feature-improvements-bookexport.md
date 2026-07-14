@@ -14,14 +14,24 @@ This document separates completed 2.0 modernization work from proposed follow-up
 - [x] Preserve PAPI/CMI-looking tokens instead of resolving them as the exporter.
 - [x] Add validated color conversion with decoration and reset preservation.
 - [x] Add Unicode-aware, bounded, traversal-safe filenames.
-- [x] Check filename collisions case-insensitively, stage complete content, and publish without replacement.
-- [x] Add paginated file listing with clickable Previous/Next player controls.
+- [x] Check filename collisions case-insensitively and write complete content through temporary files.
+- [x] Add config version 3 with a staged-by-default workflow and an explicit direct mode.
+- [x] Preserve version 2 configs in direct compatibility mode without rewriting configs or moving files.
+- [x] Add `/bookexport stage [title]`, which always stages regardless of workflow mode.
+- [x] Add explicit reviewed-draft publication with `fail`, `unique`, and `replace-with-backup` collision modes.
+- [x] Require independent `bookexport.admin.publish` and non-inherited `bookexport.admin.replace` permissions.
+- [x] Create a timestamped backup before every replacement and archive every successfully published draft.
+- [x] Reject traversal, symbolic links, non-regular candidates, overlapping workflow directories, and ambiguous case-insensitive publication matches.
+- [x] Add scoped published/staged/archive/backup listing with clickable Previous/Next player controls.
+- [x] Preserve the selected list scope during navigation, copy filenames on click, and make Publish a suggested explicit-`fail` command rather than an immediate action.
 - [x] Add validated immutable settings and safe reload rollback.
 - [x] Add granular `bookexport.*` permissions and legacy aliases.
 - [x] Add `info`, `help`, `admin`, and `debug` command families.
 - [x] Add content-free held-book diagnostics and export preview.
 - [x] Generate version and target metadata from Gradle instead of hard-coding Java constants.
 - [x] Add JUnit regression tests for filenames, colors, resets, malformed sequences, and CMI pagination.
+- [x] Add storage tests for collision modes, exact-byte backups/archives, draft preservation, traversal, and symbolic links.
+- [x] Add pure list/publish argument parser tests and Adventure action tests for navigation, clipboard names, and suggested publication.
 - [x] Rewrite the README and create an in-game beta checklist.
 
 ## Beta priorities
@@ -31,18 +41,20 @@ This document separates completed 2.0 modernization work from proposed follow-up
 - [ ] Complete every item in `checklist-bookexport.md` with at least one OP and one restricted tester.
 - [ ] Prepare repeatable fixture books: one-page, three-page, Unicode, formatted, placeholder, malformed-color, empty-page, and near-limit books.
 - [ ] Decide how player-authored CMI markup should be governed. Current behavior intentionally preserves it and therefore requires trusted export permissions.
-- [ ] Decide the production update policy for an existing CMI text. Current safe behavior creates `_1`; it does not update the existing CMI command.
+- [ ] Validate the production policy for existing CMI text: default `fail`, deliberate `unique`, or separately authorized backed-up `replace`.
 - [ ] Test CMI 9.8.8.5 and CMILib 1.5.9.9 startup stability on the exact live Paper 26.2 build before rollout.
 
-### P1: publishing workflow
+### P1: publishing workflow follow-ups
 
-- [ ] Add a staging directory and explicit `/bookexport admin publish <file>` step.
-- [ ] Add `bookexport.admin.publish` separate from author/export permission.
-- [ ] Add collision modes: `fail`, `unique`, and `replace-with-backup`.
-- [ ] Add `bookexport.admin.replace` for the destructive replacement mode.
-- [ ] Write replacement files through temporary files and atomic moves, retaining timestamped backups.
 - [ ] Optionally run a narrowly configured CMI refresh command after publish; keep it disabled by default.
 - [ ] Add a review status or manifest so staff can tell draft, approved, and published exports apart.
+- [ ] Add a small transaction journal and startup recovery report for a process or host crash between backup, publication, and archive steps.
+- [ ] Evaluate cross-process file locking or an explicit single-writer policy for destinations that external tools may edit concurrently.
+- [ ] Add a content-aware review report that flags CMI directives, interactive tags, and placeholder tokens without logging raw page content.
+- [ ] Add `/bookexport admin discard <staged-file>` with a separate permission and confirmation-oriented UI.
+- [ ] Add safe restore commands for selected archives or backups; require the same independent replacement permission and create another backup.
+- [ ] Add configurable retention and explicit prune commands for archives/backups; never prune silently by default.
+- [ ] Consider immutable checksums in publication/audit records so reviewers can prove the published bytes match the reviewed draft.
 
 ### P1: resource and abuse controls
 
@@ -51,7 +63,6 @@ This document separates completed 2.0 modernization work from proposed follow-up
 - [ ] Add maximum file count or disk quota.
 - [ ] Add an audit log containing actor, filename, time, pages, and bytes—but never page contents.
 - [ ] Snapshot Bukkit item data on the main thread and move slow external-path file I/O to a safe asynchronous worker.
-- [ ] Add symlink policy and real-path validation for administrators who use destinations outside the plugin directory.
 
 ### P1: command and permission flexibility
 
@@ -96,10 +107,13 @@ The current model deliberately keeps publishing power trusted by default.
 | Permission-filtered help | `bookexport.help` | Safe for everyone |
 | Filesystem/config status | `bookexport.admin.status` | Keep trusted; exposes destination path |
 | List filenames | `bookexport.admin.list` | Keep trusted if filenames contain private titles |
+| List staged drafts | `bookexport.admin.list.staged` | Keep separate; draft titles and publish suggestions are review data |
+| List archives | `bookexport.admin.list.archive` | Keep trusted; exposes historical titles |
+| List replacement backups | `bookexport.admin.list.backups` | Keep trusted; exposes historical live names |
 | Reload config | `bookexport.admin.reload` | Keep trusted |
 | Runtime/book diagnostics | `bookexport.admin.debug` | Keep trusted; content is intentionally omitted |
-| Publish staged CMI text | Not implemented | Add `bookexport.admin.publish` before a staging workflow |
-| Replace existing file | Not implemented | Add `bookexport.admin.replace` with backups |
+| Publish staged CMI text | `bookexport.admin.publish` | Included by `bookexport.admin`; permits `fail` and `unique`, not replacement by itself |
+| Replace existing file | `bookexport.admin.replace` | Independent, default false, and deliberately excluded from current and legacy master nodes |
 | Author active CMI markup | Included in export trust | Consider a separate node if non-staff authors are allowed |
 
 Avoid manual checks such as `childPermission || masterPermission`. Bukkit/LuckPerms child inheritance must remain authoritative so an explicit child denial works.
@@ -107,8 +121,8 @@ Avoid manual checks such as `childPermission || masterPermission`. Bukkit/LuckPe
 ## Test automation suggestions
 
 - [ ] Unit-test every filename placeholder.
-- [ ] Unit-test case-insensitive collision suffixes using a temporary directory.
-- [ ] Unit-test failed and rolled-back configuration reloads.
+- [ ] Decouple configuration parsing enough to unit-test path containment/overlap, invalid values, reload rollback, and version 2 direct compatibility without a live Bukkit server.
+- [ ] Add proxy-sender tests for permission-filtered help, scoped tab completion, staged-filename privacy, replacement separation, and explicit child denials.
 - [ ] Unit-test the five output profiles with nested colors and resets.
 - [ ] Unit-test blank, one-page, 100-page, and writable pages containing 1,024 UTF-16 code units.
 - [ ] Add a Paper test harness when a reliable 26.2-compatible harness is available.
@@ -122,4 +136,4 @@ Avoid manual checks such as `childPermission || masterPermission`. Bukkit/LuckPe
 - A PlaceholderAPI expansion: BookExport does not expose changing runtime values.
 - Support for older Paper, Spigot, or Minecraft versions.
 - Hot reload support through Bukkit `/reload` or plugin managers.
-- Silent overwrite of existing exports.
+- Silent or unbacked replacement of existing exports.

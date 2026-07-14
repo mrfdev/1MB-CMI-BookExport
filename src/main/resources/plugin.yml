@@ -4,17 +4,17 @@ version: '${version}'
 api-version: '${paperTarget}'
 author: mrfloris
 website: '${sourceUrl}'
-description: Exports Minecraft books to UTF-8 text files, with a CMI CustomText profile.
+description: Stages and publishes Minecraft books as UTF-8 text files, with a CMI CustomText profile.
 
 commands:
   bookexport:
     aliases: [bexport]
-    description: Export the held book or inspect and administer BookExport.
-    usage: /bookexport [export|info|help|admin|debug|list|reload]
+    description: Stage or export the held book, or inspect and administer BookExport.
+    usage: /bookexport [export|stage|info|help|admin|debug|list|reload]
 
 permissions:
   bookexport.admin:
-    description: Grants all BookExport administration and export capabilities.
+    description: Grants all non-destructive BookExport administration and export capabilities.
     default: op
     children:
       bookexport.export: true
@@ -23,6 +23,10 @@ permissions:
       bookexport.help: true
       bookexport.admin.status: true
       bookexport.admin.list: true
+      bookexport.admin.list.staged: true
+      bookexport.admin.list.archive: true
+      bookexport.admin.list.backups: true
+      bookexport.admin.publish: true
       bookexport.admin.reload: true
       bookexport.admin.debug: true
 
@@ -47,8 +51,28 @@ permissions:
     default: op
 
   bookexport.admin.list:
-    description: Allows listing exported text files.
+    description: Allows listing published text files.
     default: op
+
+  bookexport.admin.list.staged:
+    description: Allows listing staged draft filenames.
+    default: op
+
+  bookexport.admin.list.archive:
+    description: Allows listing archived draft filenames.
+    default: op
+
+  bookexport.admin.list.backups:
+    description: Allows listing replacement backup filenames.
+    default: op
+
+  bookexport.admin.publish:
+    description: Allows publishing staged drafts without destructive replacement.
+    default: op
+
+  bookexport.admin.replace:
+    description: Allows replacing a published file after creating a backup.
+    default: false
 
   bookexport.admin.reload:
     description: Allows reloading and validating BookExport configuration.

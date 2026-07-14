@@ -1,11 +1,31 @@
-# BookExport 2 configuration
-config-version: 2
+# BookExport 3 configuration
+#
+# Fresh version 3 configurations stage exports for review before publication.
+# Existing version 2 files load unchanged in direct compatibility mode; BookExport
+# never rewrites the file or moves existing exports during migration.
+config-version: 3
 
-# Export destination.
+# staged: /bookexport writes a draft; an administrator publishes it explicitly.
+# direct: preserve the version 2 behavior and write immediately to the published
+#         destination. /bookexport stage always stages, in either mode.
+workflow-mode: staged
+
+# Workflow directories.
 # - Relative paths stay inside plugins/BookExport/.
 # - ~/ starts at the server root.
 # - Absolute paths are accepted because only trusted admins can edit this file.
+# The four resolved directories must be writable and must not overlap.
+staging-directory: "staging"
+archive-directory: "archive"
+backup-directory: "backups"
+
+# Published destination. The existing key name is retained for compatibility.
 exported-books-directory: "~/plugins/CMI/CustomText/"
+
+# Collision behavior used by /bookexport admin publish when no mode is supplied:
+# fail, unique, or replace-with-backup. Replacement always creates a backup and
+# also requires the separately granted bookexport.admin.replace permission.
+publish-collision-mode: fail
 
 # File-name template. Supported placeholders:
 # %title%, %book_title%, %author%, %player%, %uuid%, %date%, %time%,

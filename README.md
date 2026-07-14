@@ -1,8 +1,10 @@
 # BookExport
 
-BookExport is a Paper 26.2 administration plugin that turns a written book or book and quill into a UTF-8 `.txt` file. Its default output profile publishes a book as CMI CustomText while preserving the Minecraft page order, colors, decorations, blank lines, Unicode text, and placeholder-looking tokens.
+BookExport is a Paper 26.2 administration plugin that turns a written book or book and quill into a UTF-8 `.txt` file. Its CMI output profile preserves Minecraft page order, colors, decorations, blank lines, Unicode text, and placeholder-looking tokens while producing valid CMI CustomText pagination.
 
-The 2.0.1 build is a complete modernization of the original 1.21 plugin: Java 25 bytecode, Paper 26.2 APIs, Adventure messages, correct CMI pagination, granular permissions, validated configuration, safe filenames, complete-file staging, diagnostics, and regression tests.
+Fresh installations use a review-first workflow: an author stages a draft, a trusted administrator reviews it, and an administrator publishes it into CMI's CustomText directory. Existing version 2 configurations continue in direct compatibility mode until an administrator deliberately migrates them.
+
+The 2.0.1 build modernizes the original 1.21 plugin with Java 25 bytecode, Paper 26.2 APIs, Adventure messages, Gradle, correct CMI pagination, granular permissions, validated workflow directories, collision-safe publication, diagnostics, and regression tests.
 
 ## Compatibility
 
@@ -13,37 +15,44 @@ The 2.0.1 build is a complete modernization of the original 1.21 plugin: Java 25
 | Java bytecode | Java 25 |
 | Tested runtime | Oracle Java 26.0.1 |
 | Build tool | Gradle 9.4.1 wrapper |
-| BookExport | `2.0.1` (repository build `013`) |
+| BookExport | `2.0.1` (repository build `014`) |
 
 Older Minecraft, Paper, Spigot, and Java releases are intentionally unsupported.
 
 ## Feature introduction
 
-Use Minecraft's book editor as an in-game content authoring tool. Hold the finished book, run `/bookexport`, and BookExport creates a text file that an administrator can review or publish. With the default CMI profile, the result starts with `<AutoPage>` and places `<NextPage>` only between Minecraft pages, so CMI page 1 matches Minecraft page 1.
+Use Minecraft's book editor as an in-game content authoring tool. Hold a finished book and run `/bookexport`. On a fresh installation, BookExport writes a staged draft for staff review instead of immediately changing a live CMI text. A publisher can inspect the draft outside Minecraft, list it in-game, and publish it with an explicit command.
+
+With the default CMI profile, the result starts with `<AutoPage>` and places `<NextPage>` only between Minecraft pages, so CMI page 1 matches Minecraft page 1.
 
 Typical uses include:
 
-- CMI CustomText rules, guides, news, help, and event pages
-- Drafting formatted server copy in-game
+- Drafting and publishing CMI CustomText rules, guides, news, help, and event pages
+- Reviewing player-authored server copy before it becomes live
+- Archiving published revisions and backing up replaced texts
 - Archiving written books as readable UTF-8 text
-- Converting legacy Minecraft colors into CMI, MiniMessage, ampersand, or plain text
+- Converting Minecraft colors into CMI, MiniMessage, ampersand, section-sign, or plain text
 
 ## Features
 
 - Supports signed written books and unsigned book-and-quill items in the main hand.
 - Uses the signed title automatically or an explicit custom title.
-- Provides an unambiguous `/bookexport export [title]` route for titles that match subcommands.
+- Provides unambiguous `/bookexport export [title]` and `/bookexport stage [title]` routes for titles that match subcommands.
+- Stages normal exports by default on config version 3; explicit `stage` always stages, even in direct mode.
+- Publishes reviewed drafts with `fail`, `unique`, or backed-up `replace` collision behavior.
+- Runs the archive step after every successful publication and retains a draft when publication or archiving cannot complete safely.
 - Preserves page order and page boundaries without reflowing or truncating valid book content.
 - Produces correct CMI pagination: controlled `<AutoPage>` first line and `<NextPage>` only between pages.
 - Preserves CMI and PlaceholderAPI-looking tokens for CMI to resolve for the eventual viewer.
 - Converts validated Minecraft colors and decorations to `vanilla`, `legacy`, `strip`, `cmi`, or `mini` output.
 - Uses normalized Unicode-aware filenames with configurable templates, lowercasing, length limits, and collision suffixes.
-- Stages complete UTF-8 files before a no-replace move and never overwrites an existing export.
-- Lists exports with chat-safe pagination and clickable Previous/Next controls for players.
-- Validates output paths and configuration during startup and reload.
+- Writes complete UTF-8 temporary files before collision-safe moves.
+- Lists published, staged, archived, or backup files with chat-safe pagination and clickable controls for players.
+- Makes staged Publish controls suggest an explicit `fail` command for review instead of executing it immediately.
+- Validates all workflow paths and configuration during startup and reload.
 - Offers player-safe `info` and `help`, plus trusted `admin` and `debug` diagnostics.
 - Retains the old `exportbook.*` permission nodes as compatibility aliases.
-- Treats compiler warnings as errors and includes unit tests for the high-risk conversion logic.
+- Treats compiler warnings as errors and includes unit tests for high-risk conversion and storage logic.
 
 ## Requirements and optional integrations
 
@@ -53,7 +62,7 @@ The current test-server versions, audited on 2026-07-14, are:
 
 | Plugin | Tested version | Relationship to BookExport |
 | --- | --- | --- |
-| CMI | 9.8.8.5 | Optional consumer of exported CustomText files |
+| CMI | 9.8.8.5 | Optional consumer of published CustomText files |
 | CMILib | 1.5.9.9 | CMI's dependency, not BookExport's dependency |
 | PlaceholderAPI | 2.12.3 | Optional; CMI can resolve preserved tokens at display time |
 | LuckPerms | 5.5.59 | Optional Bukkit permission provider |
@@ -69,95 +78,131 @@ Do not add these plugins to BookExport's Gradle dependencies unless BookExport l
    ./gradlew clean build
    ```
 
-2. Copy `build/libs/1MB-BookExport-v2.0.1-013-j25-26.2.jar` to the Paper 26.2 server's `plugins/` directory.
+2. Copy `build/libs/1MB-BookExport-v2.0.1-014-j25-26.2.jar` to the Paper 26.2 server's `plugins/` directory.
 3. Remove any older BookExport JAR so Paper does not discover two copies.
 4. Restart Paper cleanly. Do not use Bukkit `/reload` or a hot-reload plugin.
 5. Confirm `/version BookExport` reports `2.0.1`.
-6. Confirm `/bookexport info` reports build `013`, then review `plugins/BookExport/config.yml` and run `/bookexport admin status`.
+6. Confirm `/bookexport info` reports build `014`.
+7. Run `/bookexport admin status` and verify config version 3, workflow `staged`, four writable workflow directories, and collision mode `fail`.
+
+If the server already has a version 2 `config.yml`, BookExport intentionally starts in direct compatibility mode. It does not rewrite the config or move existing files. Follow [Migrating a version 2 configuration](#migrating-a-version-2-configuration) when ready to enable staged-by-default exports.
 
 ## Admin-player quick start
 
-1. Give a trusted staff player the master node:
+1. Give a trusted staff player the non-destructive master node:
 
    ```text
    /lp user <player> permission set bookexport.admin true
    ```
 
 2. Put a written book or book and quill in the player's main hand.
-3. Preview the export without writing a file:
+3. Preview the rendered output without writing a file:
 
    ```text
    /bookexport debug preview Server Rules
    ```
 
-4. Export it:
+4. Stage the book. With the packaged version 3 config, `/bookexport` and `/bookexport export` also stage:
 
    ```text
-   /bookexport export Server Rules
+   /bookexport stage Server Rules
    ```
 
-5. Confirm the generated filename:
+5. Review the generated draft and list it in-game:
 
    ```text
-   /bookexport list
+   /bookexport list staged
    ```
 
-6. For the default CMI destination, reload CMI and open the text:
+6. Click the draft's Publish action. It fills in a command but does not run it. Review the command and press Enter, or type it directly:
+
+   ```text
+   /bookexport admin publish server_rules.txt fail
+   ```
+
+7. Reload CMI and open the published text:
 
    ```text
    /cmi reload
    /cmi ctext server_rules <player>
    ```
 
-Only grant export access to trusted authors. Book content is intentionally preserved, so CMI directives, interactive tags, and PlaceholderAPI tokens written into a book may become active when CMI displays the exported file.
+BookExport never runs `/cmi reload` automatically.
+
+The `bookexport.admin` master node does **not** include `bookexport.admin.replace`. Grant the latter separately only to administrators who may replace a live text after BookExport creates a backup.
+
+Only grant export access to trusted authors. Book content is intentionally preserved, so CMI directives, interactive tags, and PlaceholderAPI tokens written into a book may become active when CMI displays the published file.
 
 ## Commands
 
 | Command | Description | Permission |
 | --- | --- | --- |
 | `/bexport ...` | Alias for any `/bookexport ...` route | Same as the routed command |
-| `/bookexport` | Export a signed written book using its title | `bookexport.export` |
-| `/bookexport export [title]` | Explicitly export the held book; title is required for book and quill | `bookexport.export` and, for a custom title, `bookexport.export.custom-title` |
-| `/bookexport <title>` | Legacy shorthand for a custom-title export | Same as explicit export |
-| `/bookexport info` | Show version, target, live server, and source | `bookexport.info` |
-| `/bookexport help` or `/bookexport ?` | Show only the commands the sender may use | `bookexport.help` |
-| `/bookexport admin [status]` | Show validated settings and output health | `bookexport.admin.status` |
-| `/bookexport admin list [page]` | List exported `.txt` files with adjacent-page controls | `bookexport.admin.list` |
+| `/bookexport` | Process a signed written book using its title; stages in staged mode and publishes directly in direct mode | `bookexport.export` |
+| `/bookexport export [title]` | Explicit normal-workflow export; title is required for book and quill | `bookexport.export`; a custom title also needs `bookexport.export.custom-title` |
+| `/bookexport stage [title]` | Always create a staged draft, regardless of workflow mode | `bookexport.export`; a custom title also needs `bookexport.export.custom-title` |
+| `/bookexport <title>` | Legacy shorthand for a custom-title normal-workflow export | `bookexport.export` and `bookexport.export.custom-title` |
+| `/bookexport info` | Show version, build, target, live server, and source | `bookexport.info` |
+| `/bookexport help` or `/bookexport ?` | Show only commands the sender may use | `bookexport.help` |
+| `/bookexport admin [status]` | Show validated workflow settings and directory health | `bookexport.admin.status` |
+| `/bookexport admin list [page]` | List published `.txt` files; published is the backward-compatible default scope | `bookexport.admin.list` |
+| `/bookexport admin list <published\|staged\|archive\|backups> [page]` | List files in an explicit workflow scope | Matching `bookexport.admin.list...` permission |
+| `/bookexport admin publish <staged-file> [fail\|unique\|replace]` | Publish a staged draft; omitted mode uses `publish-collision-mode` | `bookexport.admin.publish`; `replace` also needs `bookexport.admin.replace` |
 | `/bookexport admin reload` | Reload and validate `config.yml` | `bookexport.admin.reload` |
-| `/bookexport admin debug [runtime\|book\|cmi\|preview]` | Show read-only diagnostics | `bookexport.admin.debug` |
-| `/bookexport list [page]` | Compatibility shortcut with the same adjacent-page controls | `bookexport.admin.list` |
+| `/bookexport admin debug [runtime\|book\|cmi\|workflow\|preview]` | Show read-only diagnostics | `bookexport.admin.debug` |
+| `/bookexport list [page]` | Backward-compatible published-list shortcut | `bookexport.admin.list` |
+| `/bookexport list <published\|staged\|archive\|backups> [page]` | Scoped list shortcut | Matching list permission |
 | `/bookexport reload` | Compatibility shortcut for admin reload | `bookexport.admin.reload` |
-| `/bookexport debug [runtime]` | Show Java, Paper, build, directory, and failure diagnostics | `bookexport.admin.debug` |
-| `/bookexport debug book` | Inspect held-book type and size without showing its content | `bookexport.admin.debug` |
+| `/bookexport debug [runtime]` | Show Java, Paper, build, and failure diagnostics | `bookexport.admin.debug` |
+| `/bookexport debug book` | Inspect held-book type and size without showing content | `bookexport.admin.debug` |
 | `/bookexport debug cmi` | Show detected CMI stack and renderer settings | `bookexport.admin.debug` |
-| `/bookexport debug preview [title]` | Preview the sanitized filename candidate, pages, UTF-16 units, and bytes without writing; export may add a collision suffix | `bookexport.admin.debug`; custom title also needs `bookexport.export.custom-title` |
+| `/bookexport debug workflow` | Show config compatibility mode, workflow directories, counts, and collision mode | `bookexport.admin.debug` |
+| `/bookexport debug preview [title]` | Preview destination scope, sanitized filename candidate, pages, UTF-16 units, and bytes without writing | `bookexport.admin.debug`; a custom title also needs `bookexport.export.custom-title` |
 
-All information, administration, and debug commands work from the console except held-book inspection, preview, and export.
-When multiple list pages exist, players receive clickable Previous/Next controls. Console senders can navigate with an explicit page number.
+All information, administration, list, publish, and debug commands work from the console except held-book inspection, preview, and export/stage.
+
+When multiple list pages exist, player Previous/Next controls run the adjacent list command and preserve the selected scope. A filename can be clicked to copy it. A staged row's Publish action suggests `/bookexport admin publish <file> fail`; it never mutates files until the sender submits the command, and it never inherits a configured replacement policy. Console output remains readable, and console publishers type the explicit command manually.
 
 ## Command examples
 
 ```text
-# Export a signed book using its signed title
+# Stage a signed book using its signed title in the default workflow
 /bookexport
 
-# Export any held book under a chosen title
+# Explicitly stage any held book under a chosen title
+/bookexport stage July News
+
+# Follow the configured workflow under a chosen title
 /bookexport export July News
 
 # Export a title that is also a reserved subcommand
 /bookexport export info
 
-# View runtime and configuration health
+# Inspect runtime and workflow health
 /bookexport info
 /bookexport admin status
-/bookexport debug
+/bookexport debug runtime
 /bookexport debug cmi
+/bookexport debug workflow
 
 # Preview without writing
 /bookexport debug preview July News
 
-# Browse many exports
-/bookexport list 2
+# List workflow scopes and preserve scope while paging
+/bookexport list
+/bookexport list published 2
+/bookexport list staged
+/bookexport admin list archive 1
+/bookexport admin list backups
+
+# Publish only when no case-insensitive target exists
+/bookexport admin publish july_news.txt fail
+
+# Publish under july_news_1.txt when july_news.txt already exists
+/bookexport admin publish july_news.txt unique
+
+# Replace july_news.txt after creating a timestamped backup
+/bookexport admin publish july_news.txt replace
 
 # Apply an edited config safely
 /bookexport admin reload
@@ -167,27 +212,70 @@ When multiple list pages exist, players receive clickable Previous/Next controls
 
 | Permission | Default | Purpose |
 | --- | --- | --- |
-| `bookexport.admin` | OP | Master node granting all current BookExport capabilities |
-| `bookexport.export` | OP | Export the held book |
-| `bookexport.export.custom-title` | OP | Override the signed title or name a writable book export |
+| `bookexport.admin` | OP | Grants every documented non-destructive capability, including staging, scoped lists, and non-replacing publication; deliberately excludes replacement |
+| `bookexport.export` | OP | Process the held book through the configured workflow or explicit `stage` route |
+| `bookexport.export.custom-title` | OP | Override the signed title or name a writable-book export |
 | `bookexport.info` | Everyone | View public plugin and compatibility information |
 | `bookexport.help` | Everyone | View permission-filtered help |
 | `bookexport.admin.status` | OP | View paths, settings, and output health |
-| `bookexport.admin.list` | OP | List exported filenames |
+| `bookexport.admin.list` | OP | List published filenames |
+| `bookexport.admin.list.staged` | OP | List staged draft filenames and receive publish suggestions |
+| `bookexport.admin.list.archive` | OP | List archived draft filenames |
+| `bookexport.admin.list.backups` | OP | List replacement backup filenames |
+| `bookexport.admin.publish` | OP | Publish staged drafts with `fail` or `unique`, and enter the publish workflow |
+| `bookexport.admin.replace` | False | Use the backed-up `replace` collision mode; independent and not inherited by `bookexport.admin` |
 | `bookexport.admin.reload` | OP | Reload configuration |
-| `bookexport.admin.debug` | OP | View runtime, CMI, book-size, and preview diagnostics |
+| `bookexport.admin.debug` | OP | View runtime, workflow, CMI, book-size, and preview diagnostics |
 
 Legacy aliases remain available for existing LuckPerms data:
 
 | Legacy node | Default | Grants |
 | --- | --- | --- |
-| `exportbook.command` | False | `bookexport.admin` |
+| `exportbook.command` | False | `bookexport.admin`, therefore every non-destructive capability but not `bookexport.admin.replace` |
 | `exportbook.export` | False | `bookexport.export` and `bookexport.export.custom-title` |
-| `exportbook.list` | False | `bookexport.admin.list` |
+| `exportbook.list` | False | Published listing through `bookexport.admin.list` |
 | `exportbook.help` | False | `bookexport.help` |
 | `exportbook.reload` | False | `bookexport.admin.reload` |
 
-BookExport relies on permission inheritance. It does not manually bypass a denied child node when a master node is present.
+BookExport relies on Bukkit permission inheritance. It does not manually bypass a denied child node when a master node is present. Replacement is intentionally outside both the current and legacy master nodes.
+
+## Staged publishing workflow
+
+### Workflow modes
+
+| Mode | Normal `/bookexport` and `export` behavior | Explicit `stage` behavior |
+| --- | --- | --- |
+| `staged` | Write a unique draft into `staging-directory` | Write a unique draft into `staging-directory` |
+| `direct` | Write immediately into `exported-books-directory` with a unique suffix when needed | Still write a unique draft into `staging-directory` |
+
+Fresh config version 3 files default to `staged`. Existing version 2 files load in `direct` compatibility mode, regardless of any undeclared workflow key, until deliberately migrated.
+
+### File scopes
+
+| Scope | Default directory | Contents | List permission |
+| --- | --- | --- | --- |
+| `published` | `~/plugins/CMI/CustomText/` | Live CMI CustomText files | `bookexport.admin.list` |
+| `staged` | `plugins/BookExport/staging/` | Drafts awaiting review | `bookexport.admin.list.staged` |
+| `archive` | `plugins/BookExport/archive/` | Timestamped copies of successfully published drafts | `bookexport.admin.list.archive` |
+| `backups` | `plugins/BookExport/backups/` | Timestamped copies created before replacement | `bookexport.admin.list.backups` |
+
+`/bookexport list [page]` and `/bookexport admin list [page]` continue to mean the published scope for backward compatibility.
+
+### Publication and collisions
+
+The optional command mode overrides the configured `publish-collision-mode` for that one publication. Command `replace` maps to configuration value `replace-with-backup`.
+
+| Mode | When a case-insensitive published name exists | When no target exists |
+| --- | --- | --- |
+| `fail` | Stop without changing the published file; retain the staged draft | Publish with the staged filename |
+| `unique` | Publish as `_1`, `_2`, and so on | Publish with the staged filename |
+| `replace` / `replace-with-backup` | Copy the current published file to `backup-directory`, then atomically replace it | Stop and retain the staged draft; use `fail` or `unique` for a new file |
+
+Publication copies the complete staged content to a temporary file in the published directory before the final move. It rejects traversal, ambiguous case-insensitive matches, non-regular files, and symbolic-link staged candidates.
+
+After successful publication, BookExport creates a timestamped archive and removes the staged copy. If archiving fails, publication remains successful, a warning is reported, and the draft is retained when possible. A failed publication never consumes the staged draft.
+
+BookExport deliberately does not execute `/cmi reload`; an administrator remains responsible for reviewing the published file and refreshing CMI.
 
 ## Placeholders
 
@@ -219,7 +307,6 @@ These internal placeholders work in `pagination-markup`:
 | `%pages%` | Total source page count |
 
 BookExport does not register a PlaceholderAPI expansion and does not resolve PAPI or CMI placeholders inside book content. Text such as `%cmi_user_display_name%` is exported unchanged so CMI can resolve it for the player who views the CustomText later.
-
 ## CMI CustomText output
 
 With the packaged defaults, a three-page book becomes:
@@ -235,12 +322,12 @@ Minecraft page 3
 
 Important behavior:
 
-- `<NextPage>` is never written before source page 1.
+- `<NextPage>` is never generated before source page 1.
 - The controlled first line prevents book content from accidentally becoming CMI's first-line directive.
 - Filenames are lowercase by default because CMI treats CustomText names case-insensitively.
-- Existing files are never overwritten; `_1`, `_2`, and so on are appended.
-- Run `/cmi reload` after adding or changing a CustomText file.
-- CMI markup in the original book remains active by design. Restrict export permissions accordingly.
+- Draft writes and direct-mode exports use unique names; publication uses the selected collision policy.
+- Run `/cmi reload` after publishing or directly exporting a CustomText file.
+- CMI markup in the original book remains active by design. Restrict export and publication permissions accordingly.
 
 The format follows the official [CMI CustomText documentation](https://www.zrips.net/cmi/custom-text/).
 
@@ -261,8 +348,13 @@ BookExport therefore:
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `config-version` | `2` | Configuration schema marker |
-| `exported-books-directory` | `~/plugins/CMI/CustomText/` | Relative, server-root-relative, or absolute destination |
+| `config-version` | `3` | Configuration schema marker; older version 2 files receive direct compatibility behavior |
+| `workflow-mode` | `staged` | `staged` for review-first normal exports or `direct` for immediate unique publication |
+| `staging-directory` | `staging` | Draft directory |
+| `archive-directory` | `archive` | Timestamped successfully published draft history |
+| `backup-directory` | `backups` | Timestamped pre-replacement history |
+| `exported-books-directory` | `~/plugins/CMI/CustomText/` | Published destination; existing key retained for compatibility |
+| `publish-collision-mode` | `fail` | Default publication mode: `fail`, `unique`, or `replace-with-backup` |
 | `filename-format` | `%title%` | Filename template before sanitation |
 | `lowercase-filenames` | `true` | Avoid CMI name collisions on case-sensitive filesystems |
 | `maximum-filename-length` | `96` | Maximum final base length in code points, clamped to 16-160; filesystem byte safety may shorten it |
@@ -273,16 +365,40 @@ BookExport therefore:
 | `book-meta` | `false` | Add title, author, exporter, time, page, and UTF-16 unit metadata |
 | `color-code-handling` | `cmi` | `vanilla`, `legacy`, `strip`, `cmi`, or `mini` |
 | `list-page-size` | `10` | Filenames shown per list page, clamped to 1-50 |
-| `debug-logging` | `false` | Log content-free export statistics |
+| `debug-logging` | `false` | Log content-free export and publication statistics |
 
-Path resolution:
+### Path resolution and validation
 
-- `books` becomes `plugins/BookExport/books/`.
+- `staging` becomes `plugins/BookExport/staging/`.
 - `~/plugins/CMI/CustomText/` starts at the Paper server root.
 - An absolute path is used as configured.
 - A relative path containing `..` may not escape `plugins/BookExport/`.
-- Startup fails safely when the destination cannot be created or written.
+- Staging, published, archive, and backup directories must all be writable and resolve to distinct, non-overlapping locations.
+- Workflow directories may not be symbolic links. Staged publication candidates must be direct, regular, non-symbolic-link `.txt` files.
+- Startup fails safely when a configured workflow directory cannot be created, validated, or written.
 - A rejected reload leaves the previous validated runtime settings active.
+
+### Migrating a version 2 configuration
+
+Version 2 is supported as a compatibility state, not silently upgraded:
+
+- The existing file loads without being rewritten.
+- Normal `/bookexport`, `/bookexport export`, and legacy-title routes retain direct publication behavior.
+- Existing exports are not moved.
+- `/bookexport stage [title]` is available and always stages.
+- Published listing remains the default list behavior.
+
+To opt in to config version 3:
+
+1. Back up `plugins/BookExport/config.yml` and any existing BookExport/CMI text files.
+2. Add `workflow-mode`, the three workflow directory keys, and `publish-collision-mode` using the packaged config as a reference.
+3. Confirm the staging, published, archive, and backup paths are distinct and do not contain one another.
+4. Set `config-version: 3` last.
+5. Restart Paper, or run `/bookexport admin reload` if only valid BookExport settings changed.
+6. Confirm `/bookexport admin status` and `/bookexport debug workflow` show staged mode and four writable directories.
+7. Stage and publish a disposable test book before migrating production authoring.
+
+A config version newer than this build supports is rejected instead of being guessed at.
 
 ## Color profiles
 
@@ -306,16 +422,20 @@ Hex input is validated before conversion. Malformed sequences are treated as tex
 - The final `.txt` component also stays within a conservative 255-byte UTF-8 filesystem limit.
 - CMI filenames are lowercase by default.
 - Existing names are checked case-insensitively.
-- Content is fully written to a sibling temporary file before a no-replace move publishes the final name.
-- Existing targets are never replaced, including if another export claims the name concurrently.
+- Draft and direct writes are fully written to a temporary file before a no-replace move and receive `_1`, `_2`, and later suffixes when needed.
+- Staged publication uses its explicit or configured collision mode; only `replace` may modify an existing target, and it first creates a timestamped backup.
 
 ## Security and privacy
 
 - `servers/`, build output, caches, logs, IDE files, and local OS metadata are excluded by `.gitignore`.
 - Debug output reports sizes and selected validated settings, never page text, server secrets, or the full configuration file.
-- Admin status exposes the configured filesystem path and is therefore OP-only by default.
+- Admin status and scoped lists can expose filesystem paths or private draft filenames and are OP-only by default.
+- Staged-filename tab completion requires both publication and staged-list permission, so publish-only users cannot enumerate private draft names.
 - Book metadata can include player name, author, export time, and size statistics when configured. Filename templates can separately include the player's UUID.
-- Publishing directly to CMI CustomText is a trust boundary. A trusted book author can intentionally include CMI actions, placeholders, or page directives.
+- Staging creates a review boundary; it does not make author content safe. CMI actions, placeholders, or reserved directives can become active after publication.
+- The staged-list Publish action suggests an explicit `fail` command rather than silently executing it or inheriting a replacement default.
+- Replacement requires an independent permission, always creates a backup, and is excluded from both master nodes.
+- Publication rejects path traversal, symlink candidates, ambiguous case-insensitive matches, and non-regular files.
 
 ## Building and testing
 
@@ -331,7 +451,7 @@ The build:
 - targets Paper API 26.2 beta build 60;
 - treats all Java compiler warnings as errors;
 - runs JUnit 6.1.0 regression tests;
-- creates the plugin, source, and Javadoc JARs under `build/libs/`.
+- creates plugin, source, and Javadoc JARs under `build/libs/`.
 
 The main artifact uses this naming scheme:
 
@@ -339,7 +459,7 @@ The main artifact uses this naming scheme:
 1MB-BookExport-v<version>-<build>-j<java>-<minecraft>.jar
 ```
 
-For this release, build `013` is the zero-padded repository commit ordinal: twelve commits existed before the list-navigation quality-of-life commit.
+For this release, build `014` is the zero-padded repository commit ordinal: thirteen commits existed before the staged-workflow release commit.
 
 For runtime validation, use [checklist-bookexport.md](checklist-bookexport.md). Planned hardening and feature ideas are tracked in [feature-improvements-bookexport.md](feature-improvements-bookexport.md).
 
@@ -355,23 +475,43 @@ This release declares `api-version: 26.2` intentionally. Older servers are unsup
 
 ### The writable book will not export without a title
 
-Writable books have no signed title. Use `/bookexport export <title>` and grant `bookexport.export.custom-title`.
+Writable books have no signed title. Use `/bookexport stage <title>` or `/bookexport export <title>` and grant `bookexport.export.custom-title`.
 
-### The CMI text does not appear
+### The command says staged, but the CMI text does not appear
 
-Confirm the destination, run `/bookexport debug cmi`, then run `/cmi reload` before `/cmi ctext <name> <player>`.
+Staging does not change the published directory. Review `/bookexport list staged`, publish the draft, confirm `/bookexport list published`, then run `/cmi reload`.
+
+### This upgraded server still exports directly
+
+An existing config version 2 deliberately uses direct compatibility mode. BookExport does not rewrite it. Follow the version 2 migration procedure to opt in to staged mode.
+
+### Publication reports a collision
+
+The default `fail` policy protects the current live text. Review both files, then publish with `unique` or ask an administrator with the separate replacement permission to use `replace`.
+
+### Replace is denied even with `bookexport.admin`
+
+This is intentional. Grant `bookexport.admin.replace` separately. Replacement also fails when no published target exists; use `fail` or `unique` to create a new text.
+
+### Publication succeeded with an archive warning
+
+The published file is already live. Review the warning and the staged/archive directories. BookExport retains the staged draft when it cannot safely complete archiving.
+
+### A filename gained `_1`
+
+A case-insensitive equivalent already exists. Draft and direct exports always choose a unique name; `unique` publication does the same.
+
+### The CMI text still does not appear after publication
+
+Confirm `/bookexport list published`, run `/bookexport debug cmi`, then run `/cmi reload` before `/cmi ctext <name> <player>`.
 
 ### CMI shows an unexpected extra page
 
 The generated separator is correct. Check whether the original book itself contains a line equal to `<NextPage>` or other intentional CMI markup.
 
-### A filename gained `_1`
-
-BookExport never overwrites. An export with that name already exists, including a case-insensitive equivalent.
-
 ### Reload was rejected
 
-Read the server log and correct the invalid path or value. The previous validated runtime settings remain active.
+Read the server log and correct the invalid path or value. Confirm all four workflow directories are distinct and non-overlapping. The previous validated runtime settings remain active.
 
 ## Source and license
 

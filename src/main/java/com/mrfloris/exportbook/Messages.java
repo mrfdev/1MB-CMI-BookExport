@@ -23,6 +23,10 @@ final class Messages {
         return prefixed(Component.text(text, NamedTextColor.RED));
     }
 
+    static Component warning(String text) {
+        return prefixed(Component.text(text, NamedTextColor.YELLOW));
+    }
+
     static Component info(String label, String value) {
         return Component.text(label + ": ", NamedTextColor.YELLOW)
                 .append(Component.text(value, NamedTextColor.GRAY));
@@ -36,11 +40,15 @@ final class Messages {
     }
 
     static Component listNavigation(ListPage listPage) {
+        return listNavigation(listPage, FileScope.PUBLISHED);
+    }
+
+    static Component listNavigation(ListPage listPage, FileScope scope) {
         Component previous = listPage.hasPrevious()
-                ? listPageButton("← Previous", listPage.previousPage())
+                ? listPageButton("← Previous", listPage.previousPage(), scope)
                 : Component.text("[← Previous]", NamedTextColor.DARK_GRAY);
         Component next = listPage.hasNext()
-                ? listPageButton("Next →", listPage.nextPage())
+                ? listPageButton("Next →", listPage.nextPage(), scope)
                 : Component.text("[Next →]", NamedTextColor.DARK_GRAY);
 
         return Component.text()
@@ -53,6 +61,29 @@ final class Messages {
                 .build();
     }
 
+    static Component fileEntry(String filename, FileScope scope, boolean canPublish) {
+        Component filenameComponent = Component.text(filename, NamedTextColor.AQUA)
+                .clickEvent(ClickEvent.copyToClipboard(filename))
+                .hoverEvent(HoverEvent.showText(Component.text(
+                        "Click to copy this filename",
+                        NamedTextColor.GRAY
+                )));
+        TextComponent.Builder entry = Component.text()
+                .append(Component.text("- ", NamedTextColor.GRAY))
+                .append(filenameComponent);
+        if (scope == FileScope.STAGED && canPublish) {
+            String command = "/bookexport admin publish " + filename + " fail";
+            entry.append(Component.space())
+                    .append(Component.text("[Publish]", NamedTextColor.GREEN)
+                            .clickEvent(ClickEvent.suggestCommand(command))
+                            .hoverEvent(HoverEvent.showText(Component.text(
+                                    "Suggest the publish command; review it, then press Enter",
+                                    NamedTextColor.GRAY
+                            ))));
+        }
+        return entry.build();
+    }
+
     static Component source(String url) {
         return Component.text("Source: ", NamedTextColor.YELLOW)
                 .append(Component.text(url, NamedTextColor.AQUA)
@@ -60,8 +91,10 @@ final class Messages {
                         .hoverEvent(HoverEvent.showText(Component.text("Open the BookExport repository"))));
     }
 
-    private static Component listPageButton(String label, int page) {
-        String command = "/bookexport list " + page;
+    private static Component listPageButton(String label, int page, FileScope scope) {
+        String command = scope == FileScope.PUBLISHED
+                ? "/bookexport list " + page
+                : "/bookexport list " + scope.key() + ' ' + page;
         return Component.text('[' + label + ']', NamedTextColor.AQUA)
                 .clickEvent(ClickEvent.runCommand(command))
                 .hoverEvent(HoverEvent.showText(Component.text("Open list page " + page, NamedTextColor.GRAY)));

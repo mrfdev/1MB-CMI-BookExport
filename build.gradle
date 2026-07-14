@@ -5,8 +5,8 @@ plugins {
 def pluginName = 'BookExport'
 def artifactBaseName = '1MB-BookExport'
 def pluginVersion = '2.0.1'
-// Twelve commits precede this release; its release commit is repository build 013.
-def buildNumber = '013'
+// Thirteen commits precede this release; its release commit is repository build 014.
+def buildNumber = '014'
 def javaTarget = 25
 def paperTarget = '26.2'
 def paperApiVersion = '26.2.build.60-beta'
@@ -18,7 +18,7 @@ def artifactFileName = "${artifactBaseName}-${artifactVersion}.jar"
 
 group = 'com.mrfloris'
 version = pluginVersion
-description = 'Exports Minecraft books to UTF-8 text files, with a CMI CustomText profile.'
+description = 'Stages and publishes Minecraft books as UTF-8 text files, with a CMI CustomText profile.'
 
 java {
     toolchain {

@@ -54,7 +54,9 @@ public final class ExportBookPlugin extends JavaPlugin {
                 + " build " + buildInfo.buildNumber()
                 + " (Java " + buildInfo.javaTarget()
                 + ", Paper " + buildInfo.paperTarget()
-                + ", output=" + settings.exportDirectory() + ")");
+                + ", workflow=" + settings.workflowMode().key()
+                + ", staging=" + settings.stagingDirectory()
+                + ", published=" + settings.publishedDirectory() + ")");
     }
 
     @Override
@@ -112,6 +114,9 @@ public final class ExportBookPlugin extends JavaPlugin {
         } catch (InvalidConfigurationException exception) {
             throw new IOException("config.yml contains invalid YAML.", exception);
         }
+        int rawConfigVersion = candidate.contains("config-version", true)
+                ? candidate.getInt("config-version")
+                : 1;
 
         try (InputStream input = getResource("config.yml")) {
             if (input == null) {
@@ -122,6 +127,6 @@ public final class ExportBookPlugin extends JavaPlugin {
             }
         }
 
-        return ExportSettings.load(this, candidate);
+        return ExportSettings.load(this, candidate, rawConfigVersion);
     }
 }
