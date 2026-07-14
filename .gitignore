@@ -2,9 +2,6 @@
 .gradle/
 build/
 
-# Maven
-target/
-
 # IDEs and editors
 .idea/
 .vscode/
@@ -15,6 +12,9 @@ target/
 
 # Logs
 *.log
+
+# Local test servers
+/servers/
 
 # Other
 out/

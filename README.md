@@ -158,8 +158,11 @@ If the directory does not exist, BookExport will attempt to create it.
 ## Project structure
 
 ```text
-bookexport/
-├─ pom.xml
+BookExport/
+├─ gradle/
+│  └─ wrapper/
+├─ gradlew
+├─ gradlew.bat
 ├─ build.gradle
 ├─ settings.gradle
 ├─ README.md
@@ -175,13 +178,12 @@ bookexport/
          └─ config.yml
 ```
 
-## Building with Gradle (recommended)
+## Building with Gradle
 
-From the project root (where `build.gradle` lives):
+Use the included Gradle wrapper from the project root:
 
 ```bash
-cd bookexport
-gradle clean build
+./gradlew clean build
 ```
 
 The plugin JAR will be created at:
@@ -205,30 +207,12 @@ For example, to build with a local JDK 21 on macOS:
 ```bash
 brew install openjdk@21
 export JAVA_HOME=$(/usr/libexec/java_home -v 21)
-cd bookexport
-gradle clean build
+./gradlew clean build
 ```
-
-## Building with Maven
-
-If you prefer Maven:
-
-```bash
-cd bookexport
-mvn clean package
-```
-
-The plugin JAR will be created at:
-
-```text
-target/bookexport-1.0.7.jar
-```
-
-Copy that JAR to your server's `plugins/` folder and restart.
 
 ## Installation on your Paper/Spigot server
 
-1. Build the plugin with **Gradle** or **Maven**.
+1. Build the plugin with **Gradle**.
 2. Copy the compiled JAR to your Paper or Spigot 1.21.10 server's `plugins` folder.
 3. Start (or restart) the server.
 4. Give yourself permission (example with LuckPerms):
