@@ -2,6 +2,16 @@
 
 Use this checklist for an in-game review on the dedicated Paper 26.2 BookExport test server. Use disposable fixture books and filenames for collision/replacement tests. Do not include server addresses, passwords, security keys, player IPs, page contents, or full configuration files in a public bug report.
 
+## Automated baseline already completed
+
+- [x] Build 015 completed `./gradlew clean build --warning-mode all`: 161 tests, 159 passed, zero failures/errors, and two expected case-variant skips on case-insensitive APFS.
+- [x] The packaged plugin uses Java class-file major version 69 and declares Paper API 26.2.
+- [x] Paper 26.2 beta build 60 started on Java 25.0.2 with CMI 9.8.8.5 and CMILib 1.5.9.9 without a BookExport startup warning or exception.
+- [x] Console smoke covered review decisions, checksum invalidation and reapproval, legacy publication, history, incomplete creation, malformed sidecars, and corrupt-draft history isolation.
+- [x] Smoke-test fixture content was absent from logs and manifests, manifest sidecars stayed out of CMI, fixtures were removed, and the server stopped cleanly.
+
+The remaining unchecked items require an actual player/client, permission-group testing, or deliberate failure injection and are not implied by the automated baseline.
+
 ## Test record
 
 - [ ] Tester name:

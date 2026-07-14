@@ -540,6 +540,24 @@ The main artifact uses this naming scheme:
 
 For this release, build `015` is the zero-padded repository commit ordinal: fourteen commits existed before the manifest/review release commit.
 
+### Build 015 verification snapshot
+
+The release candidate was verified on 2026-07-14 before publication:
+
+- `./gradlew clean build --warning-mode all` completed successfully with 161 tests: 159 passed, zero failed, zero errored, and two case-variant tests were skipped because the test Mac uses case-insensitive APFS.
+- The main plugin class is Java class-file major version 69, and the packaged descriptor declares BookExport 2.0.1 with Paper API 26.2.
+- Paper 26.2 beta build 60 started cleanly on Oracle Java 25.0.2 with CMI 9.8.8.5, CMILib 1.5.9.9, LuckPerms 5.5.59, and PlaceholderAPI 2.12.3.
+- Console smoke tests covered explicit approval, changes requested, changed-byte rejection, reapproval, legacy implicit approval, publication history, incomplete creation markers, malformed sidecars, and isolation of valid history from an unrelated corrupt draft.
+- Distinctive fixture text did not appear in BookExport logs or manifest sidecars, no manifest entered CMI's CustomText directory, disposable fixtures were removed, and the server stopped cleanly.
+
+Final artifact SHA-256:
+
+```text
+c6b8fc623a7bad7bc846f6632d9b10cb3ad66c25ba425f5399206b06879fa948  1MB-BookExport-v2.0.1-015-j25-26.2.jar
+```
+
+This automated and console verification does not replace the in-game player review below.
+
 For runtime validation, use [checklist-bookexport.md](checklist-bookexport.md). Planned hardening and feature ideas are tracked in [feature-improvements-bookexport.md](feature-improvements-bookexport.md).
 
 ## Troubleshooting

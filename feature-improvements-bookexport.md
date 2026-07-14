@@ -45,6 +45,7 @@ This document separates completed 2.0 modernization work from proposed follow-up
 - [x] Claim a content-free creation marker before exposing native staged text, reject incomplete pairs, and resolve manifest companions case-insensitively.
 - [x] Checkpoint a committed live publication before archive/delete work so warnings cannot invite accidental republishing.
 - [x] Keep valid publication history available when an unrelated active sidecar is malformed or case-ambiguous, while direct operations on that draft still fail closed.
+- [x] Pass the build 015 release gate with 161 tests (159 passed and two filesystem-specific skips), Java class-file major version 69, and a Paper 26.2 build 60 console smoke test.
 - [x] Rewrite the README and create an in-game beta checklist.
 
 ## Beta priorities
