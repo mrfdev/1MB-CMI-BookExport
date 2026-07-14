@@ -38,7 +38,7 @@ public class ExportBookPlugin extends JavaPlugin implements TabExecutor {
     private static final String HEX_GREEN  = "§x§A§A§F§F§C§C";
     private static final String RESET      = "§r";
     private static final String VERSION    = "1.0.7";
-    private static final String SOURCE_URL = "https://github.com/mrfdev/1MB/tree/master/Resources/BookExport";
+    private static final String SOURCE_URL = "https://github.com/mrfdev/1MB-CMI-BookExport";
 
     private File exportFolder;
 

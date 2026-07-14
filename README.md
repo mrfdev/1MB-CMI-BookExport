@@ -271,9 +271,9 @@ Copy that JAR to your server's `plugins/` folder and restart.
 
 ## Source
 
-GitHub (monorepo path):
+GitHub:
 
-https://github.com/mrfdev/1MB/tree/master/Resources/BookExport
+https://github.com/mrfdev/1MB-CMI-BookExport
 
 ## License
 

@@ -8,7 +8,7 @@
     <version>1.0.7</version>
     <name>BookExport</name>
     <description>Exports written books to plaintext files.</description>
-    <url>https://github.com/mrfdev/1MB/tree/master/Resources/BookExport</url>
+    <url>https://github.com/mrfdev/1MB-CMI-BookExport</url>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
