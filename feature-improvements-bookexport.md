@@ -2,7 +2,7 @@
 
 This document separates completed 2.0 modernization work from proposed follow-up work. It is intentionally a backlog, not a claim that every idea belongs in the plugin.
 
-## Completed for 2.0 beta
+## Completed for the 2.0.1 beta cycle
 
 - [x] Target Java 25 and Paper API 26.2 beta build 60.
 - [x] Test runtime compatibility with installed Java 26.0.1.

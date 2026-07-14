@@ -7,7 +7,15 @@ import java.io.InputStream;
 import java.util.Properties;
 
 /** Build metadata generated from Gradle's single source of truth. */
-record BuildInfo(String version, String javaTarget, String paperTarget, String paperApiVersion, String sourceUrl) {
+record BuildInfo(
+        String version,
+        String buildNumber,
+        String artifactFileName,
+        String javaTarget,
+        String paperTarget,
+        String paperApiVersion,
+        String sourceUrl
+) {
     static BuildInfo load(JavaPlugin plugin) {
         Properties properties = new Properties();
         try (InputStream input = plugin.getResource("build-info.properties")) {
@@ -20,6 +28,8 @@ record BuildInfo(String version, String javaTarget, String paperTarget, String p
 
         return new BuildInfo(
                 properties.getProperty("version", plugin.getPluginMeta().getVersion()),
+                properties.getProperty("buildNumber", "unknown"),
+                properties.getProperty("artifactFileName", "unknown"),
                 properties.getProperty("javaTarget", "unknown"),
                 properties.getProperty("paperTarget", "unknown"),
                 properties.getProperty("paperApiVersion", "unknown"),

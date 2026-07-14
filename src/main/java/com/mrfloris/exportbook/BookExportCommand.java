@@ -82,7 +82,7 @@ final class BookExportCommand implements TabExecutor {
             return true;
         }
         BuildInfo build = plugin.buildInfo();
-        sender.sendMessage(Messages.header("BookExport " + build.version()));
+        sender.sendMessage(Messages.header("BookExport " + build.version() + " build " + build.buildNumber()));
         sender.sendMessage(Messages.info("Purpose", "Export written books and book-and-quill pages to UTF-8 text"));
         sender.sendMessage(Messages.info("Compatibility", "Paper " + build.paperTarget() + ", Java target " + build.javaTarget()));
         sender.sendMessage(Messages.info("Server", plugin.getServer().getVersion()));
@@ -141,6 +141,7 @@ final class BookExportCommand implements TabExecutor {
         ExportSettings settings = plugin.settings();
         sender.sendMessage(Messages.header("BookExport admin status"));
         sender.sendMessage(Messages.info("Version", plugin.buildInfo().version()));
+        sender.sendMessage(Messages.info("Build", plugin.buildInfo().buildNumber()));
         sender.sendMessage(Messages.info("Export directory", settings.exportDirectory().toString()));
         sender.sendMessage(Messages.info("Directory health",
                 Files.isDirectory(settings.exportDirectory()) && Files.isWritable(settings.exportDirectory())
@@ -233,6 +234,8 @@ final class BookExportCommand implements TabExecutor {
         BuildInfo build = plugin.buildInfo();
         sender.sendMessage(Messages.header("BookExport runtime diagnostics"));
         sender.sendMessage(Messages.info("Plugin", build.version()));
+        sender.sendMessage(Messages.info("Build", build.buildNumber()));
+        sender.sendMessage(Messages.info("Artifact", build.artifactFileName()));
         sender.sendMessage(Messages.info("Java runtime", System.getProperty("java.version")
                 + " (target " + build.javaTarget() + ')'));
         sender.sendMessage(Messages.info("JVM", System.getProperty("java.vm.name")));

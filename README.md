@@ -2,7 +2,7 @@
 
 BookExport is a Paper 26.2 administration plugin that turns a written book or book and quill into a UTF-8 `.txt` file. Its default output profile publishes a book as CMI CustomText while preserving the Minecraft page order, colors, decorations, blank lines, Unicode text, and placeholder-looking tokens.
 
-The 2.0 beta is a complete modernization of the original 1.21 plugin: Java 25 bytecode, Paper 26.2 APIs, Adventure messages, correct CMI pagination, granular permissions, validated configuration, safe filenames, complete-file staging, diagnostics, and regression tests.
+The 2.0.1 build is a complete modernization of the original 1.21 plugin: Java 25 bytecode, Paper 26.2 APIs, Adventure messages, correct CMI pagination, granular permissions, validated configuration, safe filenames, complete-file staging, diagnostics, and regression tests.
 
 ## Compatibility
 
@@ -13,7 +13,7 @@ The 2.0 beta is a complete modernization of the original 1.21 plugin: Java 25 by
 | Java bytecode | Java 25 |
 | Tested runtime | Oracle Java 26.0.1 |
 | Build tool | Gradle 9.4.1 wrapper |
-| BookExport | `2.0.0-beta.1` |
+| BookExport | `2.0.1` (repository build `012`) |
 
 Older Minecraft, Paper, Spigot, and Java releases are intentionally unsupported.
 
@@ -69,11 +69,11 @@ Do not add these plugins to BookExport's Gradle dependencies unless BookExport l
    ./gradlew clean build
    ```
 
-2. Copy `build/libs/BookExport-2.0.0-beta.1.jar` to the Paper 26.2 server's `plugins/` directory.
+2. Copy `build/libs/1MB-BookExport-v2.0.1-012-j25-26.2.jar` to the Paper 26.2 server's `plugins/` directory.
 3. Remove any older BookExport JAR so Paper does not discover two copies.
 4. Restart Paper cleanly. Do not use Bukkit `/reload` or a hot-reload plugin.
-5. Confirm `/version BookExport` reports `2.0.0-beta.1`.
-6. Review `plugins/BookExport/config.yml`, then run `/bookexport admin status`.
+5. Confirm `/version BookExport` reports `2.0.1`.
+6. Confirm `/bookexport info` reports build `012`, then review `plugins/BookExport/config.yml` and run `/bookexport admin status`.
 
 ## Admin-player quick start
 
@@ -331,6 +331,14 @@ The build:
 - treats all Java compiler warnings as errors;
 - runs JUnit 6.1.0 regression tests;
 - creates the plugin, source, and Javadoc JARs under `build/libs/`.
+
+The main artifact uses this naming scheme:
+
+```text
+1MB-BookExport-v<version>-<build>-j<java>-<minecraft>.jar
+```
+
+For this release, build `012` is the zero-padded repository commit ordinal: eleven commits existed before the version-and-artifact naming commit.
 
 For runtime validation, use [checklist-bookexport.md](checklist-bookexport.md). Planned hardening and feature ideas are tracked in [feature-improvements-bookexport.md](feature-improvements-bookexport.md).
 

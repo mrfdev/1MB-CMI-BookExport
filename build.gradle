@@ -3,12 +3,17 @@ plugins {
 }
 
 def pluginName = 'BookExport'
-def pluginVersion = '2.0.0-beta.1'
+def artifactBaseName = '1MB-BookExport'
+def pluginVersion = '2.0.1'
+// Eleven commits precede this release; its release commit is repository build 012.
+def buildNumber = '012'
 def javaTarget = 25
 def paperTarget = '26.2'
 def paperApiVersion = '26.2.build.60-beta'
 def junitVersion = '6.1.0'
 def sourceUrl = 'https://github.com/mrfdev/1MB-CMI-BookExport'
+def artifactVersion = "v${pluginVersion}-${buildNumber}-j${javaTarget}-${paperTarget}"
+def artifactFileName = "${artifactBaseName}-${artifactVersion}.jar"
 
 group = 'com.mrfloris'
 version = pluginVersion
@@ -47,18 +52,22 @@ tasks.processResources {
     filteringCharset = 'UTF-8'
     inputs.properties([
             version        : pluginVersion,
+            buildNumber    : buildNumber,
             javaTarget     : javaTarget,
             paperTarget    : paperTarget,
             paperApiVersion: paperApiVersion,
-            sourceUrl      : sourceUrl
+            sourceUrl      : sourceUrl,
+            artifactFileName: artifactFileName
     ])
     filesMatching(['plugin.yml', 'build-info.properties']) {
         expand([
                 version        : pluginVersion,
+                buildNumber    : buildNumber,
                 javaTarget     : javaTarget,
                 paperTarget    : paperTarget,
                 paperApiVersion: paperApiVersion,
-                sourceUrl      : sourceUrl
+                sourceUrl      : sourceUrl,
+                artifactFileName: artifactFileName
         ])
     }
 }
@@ -71,12 +80,18 @@ tasks.test {
     }
 }
 
+tasks.withType(Jar).configureEach {
+    archiveBaseName.set(artifactBaseName)
+    archiveVersion.set(artifactVersion)
+}
+
 tasks.jar {
-    archiveBaseName.set(pluginName)
     manifest {
         attributes(
                 'Implementation-Title': pluginName,
                 'Implementation-Version': pluginVersion,
+                'Build-Number': buildNumber,
+                'Build-Artifact': artifactFileName,
                 'Build-Java-Target': javaTarget,
                 'Build-Paper-Target': paperTarget,
                 'Build-Paper-API': paperApiVersion
@@ -89,6 +104,7 @@ tasks.register('printBuildConfig') {
     doLast {
         println 'Build config:'
         println "  jar: ${tasks.named('jar', Jar).get().archiveFile.get().asFile}"
+        println "  version/build: ${pluginVersion} / ${buildNumber}"
         println "  Java target: ${javaTarget}"
         println "  Paper target: ${paperTarget}"
         println "  Paper API: ${paperApiVersion}"

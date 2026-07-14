@@ -7,6 +7,7 @@ Use this checklist for an in-game review on the dedicated Paper 26.2 BookExport 
 - [ ] Tester name:
 - [ ] Date and timezone:
 - [ ] BookExport version:
+- [ ] BookExport build number:
 - [ ] Paper version/build:
 - [ ] Server Java version:
 - [ ] Minecraft client version:
@@ -17,7 +18,7 @@ Use this checklist for an in-game review on the dedicated Paper 26.2 BookExport 
 ## Before connecting
 
 - [ ] An administrator confirms the newest BookExport JAR is installed and older copies are removed.
-- [ ] `/version BookExport` reports `2.0.0-beta.1`.
+- [ ] `/version BookExport` reports `2.0.1` and `/bookexport info` reports build `012`.
 - [ ] `/version` reports Paper 26.2 build 60.
 - [ ] The server runtime reports Java 26.0.1 and the plugin reports Java target 25.
 - [ ] BookExport, CMI, CMILib, LuckPerms, and PlaceholderAPI are green in `/plugins`.

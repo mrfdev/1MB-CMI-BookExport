@@ -51,6 +51,7 @@ public final class ExportBookPlugin extends JavaPlugin {
         command.setTabCompleter(commandHandler);
 
         getLogger().info(() -> "Enabled BookExport " + buildInfo.version()
+                + " build " + buildInfo.buildNumber()
                 + " (Java " + buildInfo.javaTarget()
                 + ", Paper " + buildInfo.paperTarget()
                 + ", output=" + settings.exportDirectory() + ")");
