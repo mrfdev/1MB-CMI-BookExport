@@ -162,10 +162,14 @@ final class Messages {
     }
 
     static Component source(String url) {
-        return Component.text("Source: ", NamedTextColor.YELLOW)
+        return link("Source", url, "Open the BookExport repository");
+    }
+
+    static Component link(String label, String url, String hoverText) {
+        return Component.text(label + ": ", NamedTextColor.YELLOW)
                 .append(Component.text(url, NamedTextColor.AQUA)
                         .clickEvent(ClickEvent.openUrl(url))
-                        .hoverEvent(HoverEvent.showText(Component.text("Open the BookExport repository"))));
+                        .hoverEvent(HoverEvent.showText(Component.text(hoverText, NamedTextColor.GRAY))));
     }
 
     private static Component copyableFilename(String filename, String hoverText) {

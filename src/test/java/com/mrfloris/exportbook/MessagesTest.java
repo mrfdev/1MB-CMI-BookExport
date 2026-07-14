@@ -1,6 +1,7 @@
 package com.mrfloris.exportbook;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.event.ClickEvent;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +33,22 @@ class MessagesTest {
 
         assertNull(source.clickEvent());
         assertEquals(1, source.children().size());
-        assertEquals(ClickEvent.Action.OPEN_URL, source.children().getFirst().clickEvent().action());
+        assertTextClick(
+                source.children().getFirst(),
+                ClickEvent.Action.OPEN_URL,
+                "https://example.com/bookexport"
+        );
+    }
+
+    @Test
+    void labeledLinkUsesExactDocumentationUrl() {
+        String docsUrl = "https://docs.1moreblock.com/custom-server-plugins/bookexport/";
+        Component docs = Messages.link("Documentation", docsUrl, "Open the player guide");
+
+        assertNull(docs.clickEvent());
+        assertEquals("Documentation: ", assertInstanceOf(TextComponent.class, docs).content());
+        assertEquals(1, docs.children().size());
+        assertTextClick(docs.children().getFirst(), ClickEvent.Action.OPEN_URL, docsUrl);
     }
 
     @Test

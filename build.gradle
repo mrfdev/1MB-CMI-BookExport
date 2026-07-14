@@ -5,13 +5,14 @@ plugins {
 def pluginName = 'BookExport'
 def artifactBaseName = '1MB-BookExport'
 def pluginVersion = '2.0.1'
-// Fourteen commits precede this release; its release commit is repository build 015.
-def buildNumber = '015'
+// Sixteen commits precede this release; its release commit is repository build 017.
+def buildNumber = '017'
 def javaTarget = 25
 def paperTarget = '26.2'
 def paperApiVersion = '26.2.build.60-beta'
 def adventureVersion = '5.2.0'
 def junitVersion = '6.1.0'
+def docsUrl = 'https://docs.1moreblock.com/custom-server-plugins/bookexport/'
 def sourceUrl = 'https://github.com/mrfdev/1MB-CMI-BookExport'
 def artifactVersion = "v${pluginVersion}-${buildNumber}-j${javaTarget}-${paperTarget}"
 def artifactFileName = "${artifactBaseName}-${artifactVersion}.jar"
@@ -58,6 +59,7 @@ tasks.processResources {
             javaTarget     : javaTarget,
             paperTarget    : paperTarget,
             paperApiVersion: paperApiVersion,
+            docsUrl        : docsUrl,
             sourceUrl      : sourceUrl,
             artifactFileName: artifactFileName
     ])
@@ -68,6 +70,7 @@ tasks.processResources {
                 javaTarget     : javaTarget,
                 paperTarget    : paperTarget,
                 paperApiVersion: paperApiVersion,
+                docsUrl        : docsUrl,
                 sourceUrl      : sourceUrl,
                 artifactFileName: artifactFileName
         ])
@@ -96,7 +99,8 @@ tasks.jar {
                 'Build-Artifact': artifactFileName,
                 'Build-Java-Target': javaTarget,
                 'Build-Paper-Target': paperTarget,
-                'Build-Paper-API': paperApiVersion
+                'Build-Paper-API': paperApiVersion,
+                'Documentation-URL': docsUrl
         )
     }
 }

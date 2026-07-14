@@ -4,11 +4,11 @@ Use this checklist for an in-game review on the dedicated Paper 26.2 BookExport 
 
 ## Automated baseline already completed
 
-- [x] Build 015 completed `./gradlew clean build --warning-mode all`: 161 tests, 159 passed, zero failures/errors, and two expected case-variant skips on case-insensitive APFS.
+- [x] Build 017 completed `./gradlew clean build --warning-mode all`: 165 tests, 163 passed, zero failures/errors, and two expected case-variant skips on case-insensitive APFS.
 - [x] The packaged plugin uses Java class-file major version 69 and declares Paper API 26.2.
 - [x] Paper 26.2 beta build 60 started on Java 25.0.2 with CMI 9.8.8.5 and CMILib 1.5.9.9 without a BookExport startup warning or exception.
-- [x] Console smoke covered review decisions, checksum invalidation and reapproval, legacy publication, history, incomplete creation, malformed sidecars, and corrupt-draft history isolation.
-- [x] Smoke-test fixture content was absent from logs and manifests, manifest sidecars stayed out of CMI, fixtures were removed, and the server stopped cleanly.
+- [x] Build 017 live checks covered clean enable/disable, `/bookexport info`, permission-filtered help, and runtime diagnostics without a BookExport warning, error, exception, or deprecated-API message.
+- [x] Automated tests cover review decisions, checksum invalidation and reapproval, legacy publication, history, incomplete creation, malformed sidecars, and corrupt-draft history isolation. Earlier disposable integration testing confirmed that fixture content stayed out of logs and manifests, manifest sidecars stayed out of CMI, and fixtures were removed.
 
 The remaining unchecked items require an actual player/client, permission-group testing, or deliberate failure injection and are not implied by the automated baseline.
 
@@ -31,8 +31,8 @@ The remaining unchecked items require an actual player/client, permission-group 
 ## Before connecting
 
 - [ ] An administrator confirms the newest BookExport JAR is installed and older copies are removed.
-- [ ] The installed artifact is `1MB-BookExport-v2.0.1-015-j25-26.2.jar`.
-- [ ] `/version BookExport` reports `2.0.1` and `/bookexport info` reports build `015`.
+- [ ] The installed artifact is `1MB-BookExport-v2.0.1-017-j25-26.2.jar`.
+- [ ] `/version BookExport` reports `2.0.1` and `/bookexport info` reports build `017` with a clickable canonical docs link.
 - [ ] `/version` reports Paper 26.2 build 60.
 - [ ] The server runtime reports Java 25 or newer (record the exact version above) and the plugin reports Java target 25.
 - [ ] A fresh `config.yml` reports config version 3 and workflow `staged`.

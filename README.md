@@ -6,6 +6,8 @@ Fresh installations use a review-first workflow: an author stages a draft, a tru
 
 The 2.0.1 build modernizes the original 1.21 plugin with Java 25 bytecode, Paper 26.2 APIs, Adventure messages, Gradle, correct CMI pagination, granular permissions, validated workflow directories, collision-safe publication, content-free draft manifests, diagnostics, and regression tests.
 
+Canonical player documentation: [docs.1moreblock.com/custom-server-plugins/bookexport/](https://docs.1moreblock.com/custom-server-plugins/bookexport/)
+
 ## Compatibility
 
 | Component | Supported target |
@@ -15,9 +17,25 @@ The 2.0.1 build modernizes the original 1.21 plugin with Java 25 bytecode, Paper
 | Java bytecode | Java 25 |
 | Tested runtimes | Oracle Java 25.0.2 and 26.0.1 |
 | Build tool | Gradle 9.4.1 wrapper |
-| BookExport | `2.0.1` (repository build `015`) |
+| BookExport | `2.0.1` (repository build `017`) |
 
 Older Minecraft, Paper, Spigot, and Java releases are intentionally unsupported.
+
+## Documentation
+
+The README is the complete technical overview. Focused source pages are available for readers and for the namespace-safe central documentation importer:
+
+| Page | Audience and purpose |
+| --- | --- |
+| [Player guide](docs/player-guide.md) | Friendly introduction, trusted-author workflow, commands, limits, and important consequences |
+| [Commands](docs/commands.md) | Complete command, alias, console/player, and click-action reference |
+| [Permissions](docs/permissions.md) | Defaults, inheritance, replacement separation, and legacy aliases |
+| [Placeholders](docs/placeholders.md) | Filename and pagination tokens plus PlaceholderAPI behavior |
+| [Configuration](docs/configuration.md) | Every setting, validation rule, persistence behavior, reload, and version 2 migration |
+| [Installation](docs/installation.md) | Java/Paper requirements, build, clean install, update, and readiness checks |
+| [Integrations](docs/integrations.md) | Exact CMI, CMILib, PlaceholderAPI, LuckPerms, and Vault relationships |
+| [Troubleshooting](docs/troubleshooting.md) | Controlled failure states and recovery guidance |
+| [Importer manifest](docs/plugin-docs.yml) | Stable project identity for the central 1MoreBlock documentation system |
 
 ## Feature introduction
 
@@ -84,11 +102,11 @@ Do not add these plugins to BookExport's Gradle dependencies unless BookExport l
    ./gradlew clean build
    ```
 
-2. Copy `build/libs/1MB-BookExport-v2.0.1-015-j25-26.2.jar` to the Paper 26.2 server's `plugins/` directory.
+2. Copy `build/libs/1MB-BookExport-v2.0.1-017-j25-26.2.jar` to the Paper 26.2 server's `plugins/` directory.
 3. Remove any older BookExport JAR so Paper does not discover two copies.
 4. Restart Paper cleanly. Do not use Bukkit `/reload` or a hot-reload plugin.
 5. Confirm `/version BookExport` reports `2.0.1`.
-6. Confirm `/bookexport info` reports build `015`.
+6. Confirm `/bookexport info` reports build `017` and opens the canonical player documentation.
 7. Run `/bookexport admin status` and verify config version 3, workflow `staged`, four writable workflow directories, and collision mode `fail`.
 
 If the server already has a version 2 `config.yml`, BookExport intentionally starts in direct compatibility mode. It does not rewrite the config or move existing files. Follow [Migrating a version 2 configuration](#migrating-a-version-2-configuration) when ready to enable staged-by-default exports.
@@ -159,7 +177,7 @@ Only grant export access to trusted authors. Book content is intentionally prese
 | `/bookexport export [title]` | Explicit normal-workflow export; title is required for book and quill | `bookexport.export`; a custom title also needs `bookexport.export.custom-title` |
 | `/bookexport stage [title]` | Always create a staged draft, regardless of workflow mode | `bookexport.export`; a custom title also needs `bookexport.export.custom-title` |
 | `/bookexport <title>` | Legacy shorthand for a custom-title normal-workflow export | `bookexport.export` and `bookexport.export.custom-title` |
-| `/bookexport info` | Show version, build, target, live server, and source | `bookexport.info` |
+| `/bookexport info` | Introduce BookExport, show installed version/build and compatibility, suggest starting commands, and open the canonical docs or source | `bookexport.info` |
 | `/bookexport help` or `/bookexport ?` | Show only commands the sender may use | `bookexport.help` |
 | `/bookexport admin [status]` | Show validated workflow settings and directory health | `bookexport.admin.status` |
 | `/bookexport admin list [page]` | List published `.txt` files; published is the backward-compatible default scope | `bookexport.admin.list` |
@@ -171,7 +189,7 @@ Only grant export access to trusted authors. Book content is intentionally prese
 | `/bookexport admin history show <manifest-id>` | Show one retained publication record by its stable UUID | `bookexport.admin.history` |
 | `/bookexport admin publish <staged-file> [fail\|unique\|replace]` | Publish a staged draft; omitted mode uses `publish-collision-mode` | `bookexport.admin.publish`; `replace` also needs `bookexport.admin.replace` |
 | `/bookexport admin reload` | Reload and validate `config.yml` | `bookexport.admin.reload` |
-| `/bookexport admin debug [runtime\|book\|cmi\|workflow\|preview]` | Show read-only diagnostics | `bookexport.admin.debug` |
+| `/bookexport admin debug [runtime\|book\|cmi\|workflow\|preview [title]]` | Use the complete read-only debug family through the admin route | `bookexport.admin.debug`; a custom preview title also needs `bookexport.export.custom-title` |
 | `/bookexport list [page]` | Backward-compatible published-list shortcut | `bookexport.admin.list` |
 | `/bookexport list <published\|staged\|archive\|backups> [page]` | Scoped list shortcut | Matching list permission |
 | `/bookexport reload` | Compatibility shortcut for admin reload | `bookexport.admin.reload` |
@@ -424,7 +442,7 @@ BookExport therefore:
 | `archive-directory` | `archive` | Timestamped successfully published draft history |
 | `backup-directory` | `backups` | Timestamped pre-replacement history |
 | `exported-books-directory` | `~/plugins/CMI/CustomText/` | Published destination; existing key retained for compatibility |
-| `publish-collision-mode` | `fail` | Default publication mode: `fail`, `unique`, or `replace-with-backup` |
+| `publish-collision-mode` | `fail` | Default publication mode: `fail`, `unique`, or `replace-with-backup`; `replace` is accepted as an alias for the replacement mode |
 | `filename-format` | `%title%` | Filename template before sanitation |
 | `lowercase-filenames` | `true` | Avoid CMI name collisions on case-sensitive filesystems |
 | `maximum-filename-length` | `96` | Maximum final base length in code points, clamped to 16-160; filesystem byte safety may shorten it |
@@ -435,9 +453,9 @@ BookExport therefore:
 | `book-meta` | `false` | Add title, author, exporter, time, page, and UTF-16 unit metadata |
 | `color-code-handling` | `cmi` | `vanilla`, `legacy`, `strip`, `cmi`, or `mini` |
 | `list-page-size` | `10` | Filenames shown per list page, clamped to 1-50 |
-| `debug-logging` | `false` | Log content-free export and publication statistics |
+| `debug-logging` | `false` | Add content-free stage/direct-export statistics; review and publication audit metadata is logged independently |
 
-Build 015 keeps `config-version: 3` and adds no manifest or approval configuration keys. Managed sidecars are automatic for staged drafts, and explicit approval remains recommended rather than globally required so unchanged `unreviewed` and legacy drafts keep their compatible publication behavior.
+Build 017 keeps `config-version: 3` and adds no manifest or approval configuration keys. Managed sidecars are automatic for staged drafts, and explicit approval remains recommended rather than globally required so unchanged `unreviewed` and legacy drafts keep their compatible publication behavior.
 
 ### Path resolution and validation
 
@@ -538,27 +556,27 @@ The main artifact uses this naming scheme:
 1MB-BookExport-v<version>-<build>-j<java>-<minecraft>.jar
 ```
 
-For this release, build `015` is the zero-padded repository commit ordinal: fourteen commits existed before the manifest/review release commit.
+For this release, build `017` is the zero-padded repository commit ordinal: sixteen commits existed before the standalone-documentation and `/info` release commit.
 
-### Build 015 verification snapshot
+### Build 017 verification snapshot
 
 The release candidate was verified on 2026-07-14 before publication:
 
-- `./gradlew clean build --warning-mode all` completed successfully with 161 tests: 159 passed, zero failed, zero errored, and two case-variant tests were skipped because the test Mac uses case-insensitive APFS.
+- `./gradlew clean build --warning-mode all` completed successfully with 165 tests: 163 passed, zero failed, zero errored, and two case-variant tests were skipped because the test Mac uses case-insensitive APFS.
 - The main plugin class is Java class-file major version 69, and the packaged descriptor declares BookExport 2.0.1 with Paper API 26.2.
 - Paper 26.2 beta build 60 started cleanly on Oracle Java 25.0.2 with CMI 9.8.8.5, CMILib 1.5.9.9, LuckPerms 5.5.59, and PlaceholderAPI 2.12.3.
-- Console smoke tests covered explicit approval, changes requested, changed-byte rejection, reapproval, legacy implicit approval, publication history, incomplete creation markers, malformed sidecars, and isolation of valid history from an unrelated corrupt draft.
-- Distinctive fixture text did not appear in BookExport logs or manifest sidecars, no manifest entered CMI's CustomText directory, disposable fixtures were removed, and the server stopped cleanly.
+- Build 017 live checks covered clean enable/disable, `/bookexport info`, permission-filtered help, and runtime diagnostics; BookExport emitted no warning, error, exception, or deprecated-API message.
+- The automated suite covers explicit approval, changes requested, changed-byte rejection, reapproval, legacy implicit approval, publication history, incomplete creation markers, malformed sidecars, and isolation of valid history from an unrelated corrupt draft. Earlier disposable Paper/CMI integration testing also confirmed that fixture text stayed out of BookExport logs and manifest sidecars, manifests stayed out of CMI's CustomText directory, and cleanup completed.
 
 Final artifact SHA-256:
 
 ```text
-c6b8fc623a7bad7bc846f6632d9b10cb3ad66c25ba425f5399206b06879fa948  1MB-BookExport-v2.0.1-015-j25-26.2.jar
+0c409122ca6da39854acf10cefd377687cc46cd75689c16efa04cb499300f88f  1MB-BookExport-v2.0.1-017-j25-26.2.jar
 ```
 
-This automated and console verification does not replace the in-game player review below.
+This automated and console verification does not replace the repository's in-game beta review.
 
-For runtime validation, use [checklist-bookexport.md](checklist-bookexport.md). Planned hardening and feature ideas are tracked in [feature-improvements-bookexport.md](feature-improvements-bookexport.md).
+For runtime validation, use the repository's [beta tester checklist](https://github.com/mrfdev/1MB-CMI-BookExport/blob/master/checklist-bookexport.md). Planned hardening and feature ideas remain in the source repository's [feature backlog](https://github.com/mrfdev/1MB-CMI-BookExport/blob/master/feature-improvements-bookexport.md); neither project-management file is copied into the central player-documentation namespace.
 
 ## Troubleshooting
 
@@ -636,6 +654,7 @@ Read the server log and correct the invalid path or value. Confirm all four work
 
 ## Source and license
 
+- Player documentation: [docs.1moreblock.com/custom-server-plugins/bookexport/](https://docs.1moreblock.com/custom-server-plugins/bookexport/)
 - Source: [mrfdev/1MB-CMI-BookExport](https://github.com/mrfdev/1MB-CMI-BookExport)
 - Author: **mrfloris**
 - License: use at your own risk; no warranty. Credit is appreciated.

@@ -1,0 +1,12 @@
+id: bookexport
+name: BookExport
+category: custom-server-plugin
+summary: Turn Minecraft books into reviewable UTF-8 drafts and safely publish approved pages as CMI CustomText files.
+main_command: /bookexport
+docs_url: https://docs.1moreblock.com/custom-server-plugins/bookexport/
+player_guide: player-guide.md
+technical_readme: ../README.md
+java_target: "25"
+paper_target: "26.2"
+official_project: true
+repository: mrfdev/1MB-CMI-BookExport

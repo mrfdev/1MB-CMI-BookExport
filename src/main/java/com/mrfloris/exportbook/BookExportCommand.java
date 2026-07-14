@@ -134,15 +134,24 @@ final class BookExportCommand implements TabExecutor {
             return true;
         }
         BuildInfo build = plugin.buildInfo();
-        sender.sendMessage(Messages.header("BookExport " + build.version() + " build " + build.buildNumber()));
-        sender.sendMessage(Messages.info("Purpose", "Review and publish book pages as UTF-8 CMI CustomText files"));
-        sender.sendMessage(Messages.info(
-                "Compatibility",
-                "Paper " + build.paperTarget() + ", Java target " + build.javaTarget()
-        ));
-        sender.sendMessage(Messages.info("Workflow", plugin.settings().workflowMode().key()));
-        sender.sendMessage(Messages.info("Server", plugin.getServer().getVersion()));
-        sender.sendMessage(Messages.source(build.sourceUrl()));
+        BookExportInfo info = new BookExportInfo(
+                build.version(),
+                build.buildNumber(),
+                build.paperTarget(),
+                build.javaTarget(),
+                plugin.settings().workflowMode().key(),
+                plugin.getServer().getVersion(),
+                build.docsUrl(),
+                build.sourceUrl()
+        );
+        for (var message : info.messages(
+                sender.hasPermission(HELP),
+                sender.hasPermission(EXPORT),
+                sender.hasPermission(CUSTOM_TITLE),
+                sender.hasPermission(LIST_STAGED)
+        )) {
+            sender.sendMessage(message);
+        }
         return true;
     }
 
@@ -204,7 +213,7 @@ final class BookExportCommand implements TabExecutor {
         }
         if (sender.hasPermission(DEBUG)) {
             sender.sendMessage(Messages.command(
-                    "/bookexport debug [runtime|book|cmi|workflow|preview]",
+                    "/bookexport debug [runtime|book|cmi|workflow|preview [title]]",
                     "show read-only diagnostics"
             ));
         }

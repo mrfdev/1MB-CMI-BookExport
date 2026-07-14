@@ -14,8 +14,12 @@ record BuildInfo(
         String javaTarget,
         String paperTarget,
         String paperApiVersion,
+        String docsUrl,
         String sourceUrl
 ) {
+    private static final String CANONICAL_DOCS_URL =
+            "https://docs.1moreblock.com/custom-server-plugins/bookexport/";
+
     static BuildInfo load(JavaPlugin plugin) {
         Properties properties = new Properties();
         try (InputStream input = plugin.getResource("build-info.properties")) {
@@ -33,6 +37,7 @@ record BuildInfo(
                 properties.getProperty("javaTarget", "unknown"),
                 properties.getProperty("paperTarget", "unknown"),
                 properties.getProperty("paperApiVersion", "unknown"),
+                properties.getProperty("docsUrl", CANONICAL_DOCS_URL),
                 properties.getProperty("sourceUrl", plugin.getPluginMeta().getWebsite())
         );
     }
