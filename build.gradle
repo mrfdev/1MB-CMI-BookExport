@@ -2,13 +2,22 @@ plugins {
     id 'java'
 }
 
+def pluginName = 'BookExport'
+def pluginVersion = '2.0.0-beta.1'
+def javaTarget = 25
+def paperTarget = '26.2'
+def paperApiVersion = '26.2.build.60-beta'
+def junitVersion = '6.1.0'
+def sourceUrl = 'https://github.com/mrfdev/1MB-CMI-BookExport'
+
 group = 'com.mrfloris'
-version = '1.0.7'
-description = 'Exports written books to plaintext files.'
+version = pluginVersion
+description = 'Exports Minecraft books to UTF-8 text files, with a CMI CustomText profile.'
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(javaTarget)
+    }
 
     withJavadocJar()
     withSourcesJar()
@@ -17,23 +26,76 @@ java {
 repositories {
     mavenCentral()
     maven {
-        name = 'papermc-repo'
+        name = 'papermc'
         url = uri('https://repo.papermc.io/repository/maven-public/')
     }
 }
 
 dependencies {
-    compileOnly 'io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT'
+    compileOnly "io.papermc.paper:paper-api:${paperApiVersion}"
+    testImplementation "org.junit.jupiter:junit-jupiter:${junitVersion}"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher:${junitVersion}"
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    options.release = 21
+    options.release = javaTarget
+    options.compilerArgs.addAll(['-Xlint:all', '-Werror'])
+}
+
+tasks.processResources {
+    filteringCharset = 'UTF-8'
+    inputs.properties([
+            version        : pluginVersion,
+            javaTarget     : javaTarget,
+            paperTarget    : paperTarget,
+            paperApiVersion: paperApiVersion,
+            sourceUrl      : sourceUrl
+    ])
+    filesMatching(['plugin.yml', 'build-info.properties']) {
+        expand([
+                version        : pluginVersion,
+                javaTarget     : javaTarget,
+                paperTarget    : paperTarget,
+                paperApiVersion: paperApiVersion,
+                sourceUrl      : sourceUrl
+        ])
+    }
+}
+
+tasks.test {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed', 'skipped'
+        exceptionFormat = 'full'
+    }
 }
 
 tasks.jar {
-    archiveBaseName.set('BookExport')
+    archiveBaseName.set(pluginName)
+    manifest {
+        attributes(
+                'Implementation-Title': pluginName,
+                'Implementation-Version': pluginVersion,
+                'Build-Java-Target': javaTarget,
+                'Build-Paper-Target': paperTarget,
+                'Build-Paper-API': paperApiVersion
+        )
+    }
 }
+
+tasks.register('printBuildConfig') {
+    dependsOn tasks.named('jar')
+    doLast {
+        println 'Build config:'
+        println "  jar: ${tasks.named('jar', Jar).get().archiveFile.get().asFile}"
+        println "  Java target: ${javaTarget}"
+        println "  Paper target: ${paperTarget}"
+        println "  Paper API: ${paperApiVersion}"
+    }
+}
+
+tasks.build.finalizedBy(tasks.named('printBuildConfig'))
 
 tasks.wrapper {
     gradleVersion = '9.4.1'

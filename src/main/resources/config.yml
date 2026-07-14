@@ -1,62 +1,48 @@
-# BookExport configuration
+# BookExport 2 configuration
+config-version: 2
 
-# Where to store the exported books .txt files?
-# Default is plugins/BookExport/books/
-#
-# Types supported:
-# - Relative folder name (recommended):
-#     "books"
-#     -> plugins/BookExport/books/
-#
-# - Another relative name:
-#     "some-books"
-#     -> plugins/BookExport/some-books/
-#
-# - Full absolute path:
-#     "/path/to/some/folder/exported_books/"
-#
-# - From the server root using "~/":
-#     "~/plugins/CMI/CustomText/"
-#     -> <server root>/plugins/CMI/CustomText/
-#
-# If empty, BookExport will use the plugin data folder: plugins/BookExport/
+# Export destination.
+# - Relative paths stay inside plugins/BookExport/.
+# - ~/ starts at the server root.
+# - Absolute paths are accepted because only trusted admins can edit this file.
 exported-books-directory: "~/plugins/CMI/CustomText/"
 
-# Include pagination at all?
-# true  - include a pagination marker before each page
-# false - no pagination marker, just plain text pages separated by blank lines
-pagination: true
+# File-name template. Supported placeholders:
+# %title%, %book_title%, %author%, %player%, %uuid%, %date%, %time%,
+# %timestamp%, and %pages%.
+filename-format: "%title%"
 
-# In the .txt file, how should pagination show when enabled?
-# Default is: <NextPage> (For CMI ctext compatibility)
-#
-# Use %pageNumber% as an internal placeholder to show the correct page number in that location.
-# Examples:
-#   "=== Page %pageNumber% ==="
+# Lowercase names avoid CMI command collisions on case-sensitive filesystems.
+lowercase-filenames: true
+
+# Maximum final filename-base length before the .txt extension (16-160 code
+# points). A filesystem-safe UTF-8 byte ceiling can shorten it further.
+maximum-filename-length: 96
+
+# Page separation. %pageNumber% and %pages% are supported in the markup.
+pagination: true
 pagination-markup: "<NextPage>"
 
-# Include book meta data such as author, date, etc?
-# Example:
-# Title: §71MBNews-April
-# Author: Server
-# Exported by: mrfloris
-# Exported at: 2025-11-22T08:46:20.028303
-#
-# true  - include this metadata header at the top of the file
-# false - skip it, only export the raw text
+# CMI needs <NextPage> only BETWEEN pages. Enable this only for visible headings
+# such as "=== Page %pageNumber% of %pages% ===".
+pagination-on-first-page: false
+
+# In cmi mode this controlled first line prevents book content from accidentally
+# becoming CMI's first-line directive. Use <AutoPage> for CMI navigation controls.
+cmi-document-header: "<AutoPage>"
+
+# Include title, author, exporter, timestamp, page count, and character count.
 book-meta: false
 
-# How to handle Minecraft color codes in exported text.
-#
-# Options:
-#   vanilla - keep everything as-is, including §x§A§A§0§0§0§0 style hex and legacy §6 codes
-#   legacy  - keep codes but convert from § to & (so §6 becomes &6, §l becomes &l, etc.)
-#   strip   - remove all § color and formatting codes entirely
-#   cmi     - convert colors to CMI-style {#hex} tags
-#   mini    - convert colors to MiniMessage-style <#hex> tags
-#
-# Notes:
-# - Hex sequences like §x§A§A§0§0§0§0 will be converted to {#AA0000} or <#AA0000>.
-# - Legacy colors (e.g. §6) use their standard hex equivalents (e.g. #FFAA00).
-# - Formatting codes (k, l, m, n, o, r) are ignored in cmi/mini modes and not exported.
+# vanilla: preserve section-sign formatting codes
+# legacy:  convert section signs to ampersands
+# strip:   remove valid Minecraft formatting codes
+# cmi:     convert colors to {#RRGGBB} and decorations to & codes
+# mini:    convert colors and decorations to MiniMessage tags
 color-code-handling: cmi
+
+# Number of filenames per /bookexport list page (1-50).
+list-page-size: 10
+
+# Adds detailed, content-free export diagnostics to the server log.
+debug-logging: false

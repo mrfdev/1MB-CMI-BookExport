@@ -1,37 +1,90 @@
 name: BookExport
 main: com.mrfloris.exportbook.ExportBookPlugin
-version: 1.0.7
-api-version: "1.21"
-author: "mrfloris"
-description: "Exports the book in your main hand to a configurable folder as a .txt file."
+version: '${version}'
+api-version: '${paperTarget}'
+author: mrfloris
+website: '${sourceUrl}'
+description: Exports Minecraft books to UTF-8 text files, with a CMI CustomText profile.
 
 commands:
   bookexport:
-    description: Export the book in your main hand to a .txt file, or manage the plugin.
-    usage: "/bookexport [<title>|help|list|reload]"
+    aliases: [bexport]
+    description: Export the held book or inspect and administer BookExport.
+    usage: /bookexport [export|info|help|admin|debug|list|reload]
 
 permissions:
-  exportbook.command:
-    description: Legacy master permission for all BookExport commands (export, list, help, reload)
+  bookexport.admin:
+    description: Grants all BookExport administration and export capabilities.
     default: op
     children:
-      exportbook.export: true
-      exportbook.list: true
-      exportbook.help: true
-      exportbook.reload: true
+      bookexport.export: true
+      bookexport.export.custom-title: true
+      bookexport.info: true
+      bookexport.help: true
+      bookexport.admin.status: true
+      bookexport.admin.list: true
+      bookexport.admin.reload: true
+      bookexport.admin.debug: true
+
+  bookexport.export:
+    description: Allows exporting a held written or writable book.
+    default: op
+
+  bookexport.export.custom-title:
+    description: Allows choosing an export title instead of using the signed title.
+    default: op
+
+  bookexport.info:
+    description: Allows viewing public BookExport version and compatibility information.
+    default: true
+
+  bookexport.help:
+    description: Allows viewing BookExport command help.
+    default: true
+
+  bookexport.admin.status:
+    description: Allows viewing BookExport configuration and output health.
+    default: op
+
+  bookexport.admin.list:
+    description: Allows listing exported text files.
+    default: op
+
+  bookexport.admin.reload:
+    description: Allows reloading and validating BookExport configuration.
+    default: op
+
+  bookexport.admin.debug:
+    description: Allows viewing BookExport runtime and held-book diagnostics.
+    default: op
+
+  exportbook.command:
+    description: Legacy alias for bookexport.admin.
+    default: false
+    children:
+      bookexport.admin: true
 
   exportbook.export:
-    description: Allows exporting books with /bookexport and /bookexport <title>
-    default: op
+    description: Legacy alias for exporting with signed or custom titles.
+    default: false
+    children:
+      bookexport.export: true
+      bookexport.export.custom-title: true
 
   exportbook.list:
-    description: Allows listing exported .txt files with /bookexport list
-    default: op
+    description: Legacy alias for bookexport.admin.list.
+    default: false
+    children:
+      bookexport.admin.list: true
 
   exportbook.help:
-    description: Allows viewing help with /bookexport help
-    default: op
+    description: Legacy alias for bookexport.help.
+    default: false
+    children:
+      bookexport.help: true
 
   exportbook.reload:
-    description: Allows reloading the BookExport configuration with /bookexport reload
-    default: op
+    description: Legacy alias for bookexport.admin.reload.
+    default: false
+    children:
+      bookexport.admin.reload: true
