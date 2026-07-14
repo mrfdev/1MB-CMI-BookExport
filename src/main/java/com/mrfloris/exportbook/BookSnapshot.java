@@ -19,7 +19,7 @@ record BookSnapshot(
         return pages.size();
     }
 
-    int characterCount() {
+    int utf16Units() {
         return pages.stream().mapToInt(String::length).sum();
     }
 }

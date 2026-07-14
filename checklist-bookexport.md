@@ -18,7 +18,7 @@ Use this checklist for an in-game review on the dedicated Paper 26.2 BookExport 
 ## Before connecting
 
 - [ ] An administrator confirms the newest BookExport JAR is installed and older copies are removed.
-- [ ] `/version BookExport` reports `2.0.1` and `/bookexport info` reports build `012`.
+- [ ] `/version BookExport` reports `2.0.1` and `/bookexport info` reports build `013`.
 - [ ] `/version` reports Paper 26.2 build 60.
 - [ ] The server runtime reports Java 26.0.1 and the plugin reports Java target 25.
 - [ ] BookExport, CMI, CMILib, LuckPerms, and PlaceholderAPI are green in `/plugins`.
@@ -42,9 +42,9 @@ Use this checklist for an in-game review on the dedicated Paper 26.2 BookExport 
 - [ ] `/bookexport debug` shows Java runtime, Java target, Paper API, live server, directory health, and last failure.
 - [ ] `/bookexport debug cmi` detects CMI, CMILib, and PlaceholderAPI with the installed versions.
 - [ ] `/bookexport debug cmi` reminds the tester to run `/cmi reload`.
-- [ ] `/bookexport debug book` reports only held-book type/title presence/page and character counts—not page contents.
-- [ ] `/bookexport debug preview <title>` reports a filename and size but writes no file.
-- [ ] `/bookexport admin list` and `/bookexport admin debug` match their top-level shortcut behavior.
+- [ ] `/bookexport debug book` reports only held-book type/title presence/page and UTF-16 unit counts—not page contents.
+- [ ] `/bookexport debug preview <title>` reports a sanitized filename candidate, pages, UTF-16 units, and bytes but writes no file; a later export may add a collision suffix.
+- [ ] `/bookexport admin list` and `/bookexport admin debug` match their top-level shortcut behavior, including adjacent-page controls.
 - [ ] Console admin/debug commands do not reveal credentials or page content.
 - [ ] `/bookexport admin reload` accepts valid config changes.
 - [ ] A fatal invalid path or malformed YAML reload is rejected, the file is not overwritten, and the prior validated runtime settings keep working.
@@ -83,7 +83,8 @@ Test with an unprivileged player, narrow nodes, and the master node.
 
 - [ ] Spaces become underscores.
 - [ ] Default CMI filenames become lowercase.
-- [ ] Accented, non-Latin, and Unicode titles remain readable.
+- [ ] Accented and non-Latin Unicode letters and digits remain readable.
+- [ ] Unsupported symbols, emoji, and uncombined marks are removed safely; a title that sanitizes to nothing fails cleanly.
 - [ ] `/`, `\\`, `:`, `*`, `?`, quotes, and control characters cannot create another path.
 - [ ] `../` cannot escape the configured destination.
 - [ ] A very long title is safely shortened without splitting a Unicode character.
@@ -91,6 +92,11 @@ Test with an unprivileged player, narrow nodes, and the master node.
 - [ ] Re-exporting the same title creates `_1`, then `_2`, without overwriting.
 - [ ] Names differing only by case still receive a collision suffix.
 - [ ] `/bookexport list [page]` shows only `.txt` filenames and paginates cleanly.
+- [ ] Page 1 shows a clickable Next control but no clickable Previous control.
+- [ ] A middle page shows working clickable Previous and Next controls.
+- [ ] The last page shows a clickable Previous control but no clickable Next control.
+- [ ] Each control opens the correct adjacent page and rechecks `bookexport.admin.list`.
+- [ ] Console listing remains readable and works with explicit page numbers.
 
 ## Page and text fidelity
 
@@ -145,7 +151,7 @@ Repeat a small fixture containing legacy colors, hex colors, bold, underline, it
 - [ ] An unwritable destination fails in a controlled way and records a useful log message.
 - [ ] `pagination: false` separates source pages with a blank line.
 - [ ] A visible heading such as `=== Page %pageNumber% of %pages% ===` works with `pagination-on-first-page: true`.
-- [ ] Metadata toggles all documented metadata lines.
+- [ ] Metadata toggles all documented metadata lines, including the UTF-16 unit count.
 - [ ] Debug logging adds statistics without logging page contents.
 
 ## Restart and log review

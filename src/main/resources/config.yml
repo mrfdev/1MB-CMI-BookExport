@@ -31,7 +31,7 @@ pagination-on-first-page: false
 # becoming CMI's first-line directive. Use <AutoPage> for CMI navigation controls.
 cmi-document-header: "<AutoPage>"
 
-# Include title, author, exporter, timestamp, page count, and character count.
+# Include title, author, exporter, timestamp, page count, and UTF-16 unit count.
 book-meta: false
 
 # vanilla: preserve section-sign formatting codes

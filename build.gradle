@@ -5,11 +5,12 @@ plugins {
 def pluginName = 'BookExport'
 def artifactBaseName = '1MB-BookExport'
 def pluginVersion = '2.0.1'
-// Eleven commits precede this release; its release commit is repository build 012.
-def buildNumber = '012'
+// Twelve commits precede this release; its release commit is repository build 013.
+def buildNumber = '013'
 def javaTarget = 25
 def paperTarget = '26.2'
 def paperApiVersion = '26.2.build.60-beta'
+def adventureVersion = '5.2.0'
 def junitVersion = '6.1.0'
 def sourceUrl = 'https://github.com/mrfdev/1MB-CMI-BookExport'
 def artifactVersion = "v${pluginVersion}-${buildNumber}-j${javaTarget}-${paperTarget}"
@@ -38,6 +39,7 @@ repositories {
 
 dependencies {
     compileOnly "io.papermc.paper:paper-api:${paperApiVersion}"
+    testImplementation "net.kyori:adventure-api:${adventureVersion}"
     testImplementation "org.junit.jupiter:junit-jupiter:${junitVersion}"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher:${junitVersion}"
 }

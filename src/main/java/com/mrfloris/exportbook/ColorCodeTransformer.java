@@ -38,6 +38,13 @@ final class ColorCodeTransformer {
                 continue;
             }
 
+            if (code == 'x') {
+                int malformedEnd = malformedUnusualHexEnd(input, index);
+                output.append(input, index, malformedEnd);
+                index = malformedEnd - 1;
+                continue;
+            }
+
             if (isLegacyColor(code)) {
                 if (mode == ColorMode.LEGACY) {
                     output.append('&').append(code);
@@ -58,6 +65,17 @@ final class ColorCodeTransformer {
             output.append(current);
         }
         return output.toString();
+    }
+
+    private static int malformedUnusualHexEnd(String input, int start) {
+        int end = Math.min(input.length(), start + 2);
+        for (int pair = 0; pair < 6 && end + 1 < input.length(); pair++) {
+            if (input.charAt(end) != SECTION) {
+                break;
+            }
+            end += 2;
+        }
+        return end;
     }
 
     private static String readUnusualHex(String input, int start) {

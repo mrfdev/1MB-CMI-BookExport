@@ -15,7 +15,7 @@ This document separates completed 2.0 modernization work from proposed follow-up
 - [x] Add validated color conversion with decoration and reset preservation.
 - [x] Add Unicode-aware, bounded, traversal-safe filenames.
 - [x] Check filename collisions case-insensitively, stage complete content, and publish without replacement.
-- [x] Add paginated file listing.
+- [x] Add paginated file listing with clickable Previous/Next player controls.
 - [x] Add validated immutable settings and safe reload rollback.
 - [x] Add granular `bookexport.*` permissions and legacy aliases.
 - [x] Add `info`, `help`, `admin`, and `debug` command families.
@@ -57,7 +57,6 @@ This document separates completed 2.0 modernization work from proposed follow-up
 
 - [ ] Add configurable/localizable messages.
 - [ ] Add `/bookexport help <command>` detail pages.
-- [ ] Add clickable previous/next controls to `/bookexport list`.
 - [ ] Add `/bookexport admin validate` to validate configuration and destination without applying changes.
 - [ ] Add `/bookexport admin history [player]` once an audit log exists.
 - [ ] Consider separate runtime, held-book, CMI, and preview debug permission nodes.
@@ -111,7 +110,7 @@ Avoid manual checks such as `childPermission || masterPermission`. Bukkit/LuckPe
 - [ ] Unit-test case-insensitive collision suffixes using a temporary directory.
 - [ ] Unit-test failed and rolled-back configuration reloads.
 - [ ] Unit-test the five output profiles with nested colors and resets.
-- [ ] Unit-test blank, one-page, 100-page, and 1,024-character writable pages.
+- [ ] Unit-test blank, one-page, 100-page, and writable pages containing 1,024 UTF-16 code units.
 - [ ] Add a Paper test harness when a reliable 26.2-compatible harness is available.
 - [ ] Add a CI workflow that runs `./gradlew clean build --warning-mode all` on Java 25.
 - [ ] Verify class major version 69 and expanded `plugin.yml` as build assertions.

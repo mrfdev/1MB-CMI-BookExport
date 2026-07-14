@@ -14,7 +14,7 @@ final class BookTextRenderer {
             LocalDateTime exportedAt,
             ExportSettings settings
     ) {
-        StringBuilder output = new StringBuilder(Math.max(256, book.characterCount() + 128));
+        StringBuilder output = new StringBuilder(Math.max(256, book.utf16Units() + 128));
         if (settings.colorMode() == ColorMode.CMI) {
             appendLine(output, settings.cmiDocumentHeader());
         }
@@ -25,7 +25,7 @@ final class BookTextRenderer {
             appendLine(output, "Exported by: " + playerName);
             appendLine(output, "Exported at: " + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(exportedAt));
             appendLine(output, "Pages: " + book.pageCount());
-            appendLine(output, "Characters: " + book.characterCount());
+            appendLine(output, "UTF-16 units: " + book.utf16Units());
             output.append('\n');
         }
 

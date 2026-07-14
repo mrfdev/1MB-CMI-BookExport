@@ -35,11 +35,36 @@ final class Messages {
         return clickable.append(Component.text(" - " + description, NamedTextColor.GRAY));
     }
 
+    static Component listNavigation(ListPage listPage) {
+        Component previous = listPage.hasPrevious()
+                ? listPageButton("← Previous", listPage.previousPage())
+                : Component.text("[← Previous]", NamedTextColor.DARK_GRAY);
+        Component next = listPage.hasNext()
+                ? listPageButton("Next →", listPage.nextPage())
+                : Component.text("[Next →]", NamedTextColor.DARK_GRAY);
+
+        return Component.text()
+                .append(previous)
+                .append(Component.text(
+                        "  Page " + listPage.page() + '/' + listPage.pageCount() + "  ",
+                        NamedTextColor.GRAY
+                ))
+                .append(next)
+                .build();
+    }
+
     static Component source(String url) {
         return Component.text("Source: ", NamedTextColor.YELLOW)
                 .append(Component.text(url, NamedTextColor.AQUA)
                         .clickEvent(ClickEvent.openUrl(url))
                         .hoverEvent(HoverEvent.showText(Component.text("Open the BookExport repository"))));
+    }
+
+    private static Component listPageButton(String label, int page) {
+        String command = "/bookexport list " + page;
+        return Component.text('[' + label + ']', NamedTextColor.AQUA)
+                .clickEvent(ClickEvent.runCommand(command))
+                .hoverEvent(HoverEvent.showText(Component.text("Open list page " + page, NamedTextColor.GRAY)));
     }
 
     private static Component prefixed(Component message) {

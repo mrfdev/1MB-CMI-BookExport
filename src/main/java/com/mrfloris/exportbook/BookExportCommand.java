@@ -183,14 +183,19 @@ final class BookExportCommand implements TabExecutor {
                 return true;
             }
 
-            int pageSize = plugin.settings().listPageSize();
-            int pageCount = Math.max(1, (files.size() + pageSize - 1) / pageSize);
-            int page = Math.min(requestedPage, pageCount);
-            int start = (page - 1) * pageSize;
-            int end = Math.min(start + pageSize, files.size());
-            sender.sendMessage(Messages.header("BookExport files (page " + page + '/' + pageCount + ")"));
-            for (String file : files.subList(start, end)) {
+            ListPage listPage = ListPage.calculate(
+                    files.size(),
+                    requestedPage,
+                    plugin.settings().listPageSize()
+            );
+            sender.sendMessage(Messages.header(
+                    "BookExport files (page " + listPage.page() + '/' + listPage.pageCount() + ')'
+            ));
+            for (String file : files.subList(listPage.fromIndex(), listPage.toIndex())) {
                 sender.sendMessage(Component.text("- " + file, NamedTextColor.GRAY));
+            }
+            if (listPage.pageCount() > 1) {
+                sender.sendMessage(Messages.listNavigation(listPage));
             }
         } catch (BookExportException exception) {
             plugin.recordFailure(exception.getMessage());
@@ -265,7 +270,7 @@ final class BookExportCommand implements TabExecutor {
             sender.sendMessage(Messages.info("Has title", Boolean.toString(!book.plainTitle().isBlank())));
             sender.sendMessage(Messages.info("Has author", Boolean.toString(!book.plainAuthor().isBlank())));
             sender.sendMessage(Messages.info("Pages", Integer.toString(book.pageCount())));
-            sender.sendMessage(Messages.info("Characters", Integer.toString(book.characterCount())));
+            sender.sendMessage(Messages.info("UTF-16 units", Integer.toString(book.utf16Units())));
         } catch (IllegalArgumentException exception) {
             sender.sendMessage(Messages.error("Unable to read the held book metadata."));
         }
@@ -298,9 +303,9 @@ final class BookExportCommand implements TabExecutor {
         try {
             ExportPreview preview = exporter.preview(player, requestedTitle);
             sender.sendMessage(Messages.header("BookExport preview (no file written)"));
-            sender.sendMessage(Messages.info("Filename", preview.filenameBase() + ".txt"));
+            sender.sendMessage(Messages.info("Filename candidate", preview.filenameBase() + ".txt"));
             sender.sendMessage(Messages.info("Pages", Integer.toString(preview.book().pageCount())));
-            sender.sendMessage(Messages.info("Characters", Integer.toString(preview.book().characterCount())));
+            sender.sendMessage(Messages.info("UTF-16 units", Integer.toString(preview.book().utf16Units())));
             sender.sendMessage(Messages.info("UTF-8 bytes", Integer.toString(preview.utf8Bytes())));
         } catch (BookExportException exception) {
             sender.sendMessage(Messages.error(exception.getMessage()));

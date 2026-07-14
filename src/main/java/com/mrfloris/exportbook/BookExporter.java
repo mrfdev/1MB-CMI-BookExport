@@ -86,13 +86,13 @@ final class BookExporter {
             plugin.getLogger().info(() -> "Exported " + path.getFileName()
                     + " for " + player.getName()
                     + " (pages=" + preview.book().pageCount()
-                    + ", characters=" + preview.book().characterCount()
+                    + ", utf16Units=" + preview.book().utf16Units()
                     + ", bytes=" + preview.utf8Bytes() + ")");
         }
         return new ExportResult(
                 path,
                 preview.book().pageCount(),
-                preview.book().characterCount(),
+                preview.book().utf16Units(),
                 preview.utf8Bytes()
         );
     }

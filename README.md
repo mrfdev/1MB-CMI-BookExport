@@ -13,7 +13,7 @@ The 2.0.1 build is a complete modernization of the original 1.21 plugin: Java 25
 | Java bytecode | Java 25 |
 | Tested runtime | Oracle Java 26.0.1 |
 | Build tool | Gradle 9.4.1 wrapper |
-| BookExport | `2.0.1` (repository build `012`) |
+| BookExport | `2.0.1` (repository build `013`) |
 
 Older Minecraft, Paper, Spigot, and Java releases are intentionally unsupported.
 
@@ -39,7 +39,7 @@ Typical uses include:
 - Converts validated Minecraft colors and decorations to `vanilla`, `legacy`, `strip`, `cmi`, or `mini` output.
 - Uses normalized Unicode-aware filenames with configurable templates, lowercasing, length limits, and collision suffixes.
 - Stages complete UTF-8 files before a no-replace move and never overwrites an existing export.
-- Lists exports with chat-safe pagination.
+- Lists exports with chat-safe pagination and clickable Previous/Next controls for players.
 - Validates output paths and configuration during startup and reload.
 - Offers player-safe `info` and `help`, plus trusted `admin` and `debug` diagnostics.
 - Retains the old `exportbook.*` permission nodes as compatibility aliases.
@@ -47,7 +47,7 @@ Typical uses include:
 
 ## Requirements and optional integrations
 
-Paper is the only production/plugin API dependency. JUnit is used only by the test suite. BookExport does not call the APIs of CMI, CMILib, PlaceholderAPI, Vault, or LuckPerms.
+Paper is the only production/plugin API dependency. JUnit and the Paper-aligned Adventure API are used only by the test suite and are not bundled. BookExport does not call the APIs of CMI, CMILib, PlaceholderAPI, Vault, or LuckPerms.
 
 The current test-server versions, audited on 2026-07-14, are:
 
@@ -69,11 +69,11 @@ Do not add these plugins to BookExport's Gradle dependencies unless BookExport l
    ./gradlew clean build
    ```
 
-2. Copy `build/libs/1MB-BookExport-v2.0.1-012-j25-26.2.jar` to the Paper 26.2 server's `plugins/` directory.
+2. Copy `build/libs/1MB-BookExport-v2.0.1-013-j25-26.2.jar` to the Paper 26.2 server's `plugins/` directory.
 3. Remove any older BookExport JAR so Paper does not discover two copies.
 4. Restart Paper cleanly. Do not use Bukkit `/reload` or a hot-reload plugin.
 5. Confirm `/version BookExport` reports `2.0.1`.
-6. Confirm `/bookexport info` reports build `012`, then review `plugins/BookExport/config.yml` and run `/bookexport admin status`.
+6. Confirm `/bookexport info` reports build `013`, then review `plugins/BookExport/config.yml` and run `/bookexport admin status`.
 
 ## Admin-player quick start
 
@@ -122,17 +122,18 @@ Only grant export access to trusted authors. Book content is intentionally prese
 | `/bookexport info` | Show version, target, live server, and source | `bookexport.info` |
 | `/bookexport help` or `/bookexport ?` | Show only the commands the sender may use | `bookexport.help` |
 | `/bookexport admin [status]` | Show validated settings and output health | `bookexport.admin.status` |
-| `/bookexport admin list [page]` | List exported `.txt` files | `bookexport.admin.list` |
+| `/bookexport admin list [page]` | List exported `.txt` files with adjacent-page controls | `bookexport.admin.list` |
 | `/bookexport admin reload` | Reload and validate `config.yml` | `bookexport.admin.reload` |
 | `/bookexport admin debug [runtime\|book\|cmi\|preview]` | Show read-only diagnostics | `bookexport.admin.debug` |
-| `/bookexport list [page]` | Compatibility shortcut for admin list | `bookexport.admin.list` |
+| `/bookexport list [page]` | Compatibility shortcut with the same adjacent-page controls | `bookexport.admin.list` |
 | `/bookexport reload` | Compatibility shortcut for admin reload | `bookexport.admin.reload` |
 | `/bookexport debug [runtime]` | Show Java, Paper, build, directory, and failure diagnostics | `bookexport.admin.debug` |
 | `/bookexport debug book` | Inspect held-book type and size without showing its content | `bookexport.admin.debug` |
 | `/bookexport debug cmi` | Show detected CMI stack and renderer settings | `bookexport.admin.debug` |
-| `/bookexport debug preview [title]` | Calculate filename, pages, characters, and bytes without writing | `bookexport.admin.debug`; custom title also needs `bookexport.export.custom-title` |
+| `/bookexport debug preview [title]` | Preview the sanitized filename candidate, pages, UTF-16 units, and bytes without writing; export may add a collision suffix | `bookexport.admin.debug`; custom title also needs `bookexport.export.custom-title` |
 
 All information, administration, and debug commands work from the console except held-book inspection, preview, and export.
+When multiple list pages exist, players receive clickable Previous/Next controls. Console senders can navigate with an explicit page number.
 
 ## Command examples
 
@@ -254,7 +255,7 @@ BookExport therefore:
 - reads written-book pages through modern Adventure components;
 - serializes visible text, colors, and decorations into the selected text profile;
 - cannot represent hover events, click events, insertion events, selectors, or other interactive component behavior in a plain `.txt` file;
-- reports raw page and character statistics through `/bookexport debug book`.
+- reports raw page and UTF-16 unit statistics through `/bookexport debug book`.
 
 ## Configuration
 
@@ -269,7 +270,7 @@ BookExport therefore:
 | `pagination-markup` | `<NextPage>` | Marker written between pages |
 | `pagination-on-first-page` | `false` | Also write the marker before page 1; leave false for CMI |
 | `cmi-document-header` | `<AutoPage>` | Controlled first line in `cmi` mode |
-| `book-meta` | `false` | Add title, author, exporter, time, page, and character metadata |
+| `book-meta` | `false` | Add title, author, exporter, time, page, and UTF-16 unit metadata |
 | `color-code-handling` | `cmi` | `vanilla`, `legacy`, `strip`, `cmi`, or `mini` |
 | `list-page-size` | `10` | Filenames shown per list page, clamped to 1-50 |
 | `debug-logging` | `false` | Log content-free export statistics |
@@ -311,9 +312,9 @@ Hex input is validated before conversion. Malformed sequences are treated as tex
 ## Security and privacy
 
 - `servers/`, build output, caches, logs, IDE files, and local OS metadata are excluded by `.gitignore`.
-- Debug output reports sizes and state, never page text, server secrets, or configuration-file contents.
+- Debug output reports sizes and selected validated settings, never page text, server secrets, or the full configuration file.
 - Admin status exposes the configured filesystem path and is therefore OP-only by default.
-- Book metadata can include player name, UUID-derived filename data, author, and export time when configured.
+- Book metadata can include player name, author, export time, and size statistics when configured. Filename templates can separately include the player's UUID.
 - Publishing directly to CMI CustomText is a trust boundary. A trusted book author can intentionally include CMI actions, placeholders, or page directives.
 
 ## Building and testing
@@ -338,7 +339,7 @@ The main artifact uses this naming scheme:
 1MB-BookExport-v<version>-<build>-j<java>-<minecraft>.jar
 ```
 
-For this release, build `012` is the zero-padded repository commit ordinal: eleven commits existed before the version-and-artifact naming commit.
+For this release, build `013` is the zero-padded repository commit ordinal: twelve commits existed before the list-navigation quality-of-life commit.
 
 For runtime validation, use [checklist-bookexport.md](checklist-bookexport.md). Planned hardening and feature ideas are tracked in [feature-improvements-bookexport.md](feature-improvements-bookexport.md).
 

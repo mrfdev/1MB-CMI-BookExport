@@ -30,6 +30,21 @@ class ColorCodeTransformerTest {
     }
 
     @Test
+    void preservesMalformedUnusualHexWithoutReinterpretingInnerPairs() {
+        String malformed = "§x§1§2§3§4§5§Z";
+        String input = "Broken " + malformed + " and valid §cRed";
+
+        assertEquals(
+                "Broken " + malformed + " and valid Red",
+                ColorCodeTransformer.transform(input, ColorMode.STRIP)
+        );
+        assertEquals(
+                "Broken " + malformed + " and valid {#FF5555}Red",
+                ColorCodeTransformer.transform(input, ColorMode.CMI)
+        );
+    }
+
+    @Test
     void convertsMiniMessageDecorations() {
         assertEquals(
                 "<bold>Bold<underlined> underline<reset> plain",
