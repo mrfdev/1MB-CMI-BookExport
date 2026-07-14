@@ -4,11 +4,15 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MessagesTest {
     @Test
@@ -90,18 +94,38 @@ class MessagesTest {
     }
 
     @Test
-    void stagedFileEntryCopiesFilenameAndOnlySuggestsPublish() {
-        Component entry = Messages.fileEntry("rules.txt", FileScope.STAGED, true);
+    void stagedFileEntryUsesSafeReviewAndMutationActions() {
+        Component entry = Messages.stagedFileEntry(
+                "rules.txt",
+                DraftListStatus.UNREVIEWED,
+                true,
+                true,
+                true
+        );
 
         assertNull(entry.clickEvent());
-        assertEquals(4, entry.children().size());
         assertTextClick(
                 entry.children().get(1),
                 ClickEvent.Action.COPY_TO_CLIPBOARD,
                 "rules.txt"
         );
-        assertTextClick(
-                entry.children().get(3),
+        assertHasTextClick(
+                entry,
+                ClickEvent.Action.RUN_COMMAND,
+                "/bookexport admin review rules.txt"
+        );
+        assertHasTextClick(
+                entry,
+                ClickEvent.Action.SUGGEST_COMMAND,
+                "/bookexport admin approve rules.txt"
+        );
+        assertHasTextClick(
+                entry,
+                ClickEvent.Action.SUGGEST_COMMAND,
+                "/bookexport admin changes rules.txt"
+        );
+        assertHasTextClick(
+                entry,
                 ClickEvent.Action.SUGGEST_COMMAND,
                 "/bookexport admin publish rules.txt fail"
         );
@@ -109,7 +133,7 @@ class MessagesTest {
 
     @Test
     void nonStagedFileNeverShowsPublishAction() {
-        Component entry = Messages.fileEntry("rules.txt", FileScope.PUBLISHED, true);
+        Component entry = Messages.fileEntry("rules.txt", FileScope.PUBLISHED);
 
         assertEquals(2, entry.children().size());
         assertTextClick(
@@ -120,14 +144,83 @@ class MessagesTest {
     }
 
     @Test
-    void stagedFileEntryHidesPublishActionWithoutPermission() {
-        Component entry = Messages.fileEntry("rules.txt", FileScope.STAGED, false);
+    void stagedFileEntryHidesAllActionsWithoutPermission() {
+        Component entry = Messages.stagedFileEntry(
+                "rules.txt",
+                DraftListStatus.APPROVED,
+                false,
+                false,
+                false
+        );
 
-        assertEquals(2, entry.children().size());
         assertTextClick(
                 entry.children().get(1),
                 ClickEvent.Action.COPY_TO_CLIPBOARD,
                 "rules.txt"
+        );
+        assertFalse(entry.children().stream().skip(2).anyMatch(child -> child.clickEvent() != null));
+    }
+
+    @Test
+    void unsafeStateOffersReadOnlyReviewButNoMutation() {
+        Component entry = Messages.stagedFileEntry(
+                "rules.txt",
+                DraftListStatus.CORRUPT,
+                true,
+                true,
+                true
+        );
+
+        assertHasTextClick(
+                entry,
+                ClickEvent.Action.RUN_COMMAND,
+                "/bookexport admin review rules.txt"
+        );
+        assertFalse(hasClickValue(entry, "/bookexport admin approve rules.txt"));
+        assertFalse(hasClickValue(entry, "/bookexport admin changes rules.txt"));
+        assertFalse(hasClickValue(entry, "/bookexport admin publish rules.txt fail"));
+    }
+
+    @Test
+    void historyNavigationUsesAdminHistoryRoute() {
+        Component navigation = Messages.historyNavigation(ListPage.calculate(30, 2, 10));
+
+        assertRunCommand(navigation.children().get(0), "/bookexport admin history 1");
+        assertRunCommand(navigation.children().get(2), "/bookexport admin history 3");
+    }
+
+    @Test
+    void historyEntryCopiesIdAndRunsOnlyReadOnlyShow() {
+        DraftManifest manifest = nativeManifest();
+        Component entry = Messages.historyEntry(manifest);
+
+        assertNull(entry.clickEvent());
+        assertTextClick(
+                entry.children().get(1),
+                ClickEvent.Action.COPY_TO_CLIPBOARD,
+                manifest.draftId().toString()
+        );
+        assertHasTextClick(
+                entry,
+                ClickEvent.Action.RUN_COMMAND,
+                "/bookexport admin history show " + manifest.draftId()
+        );
+        assertFalse(entry.children().stream()
+                .map(Component::clickEvent)
+                .filter(click -> click != null)
+                .anyMatch(click -> click.action() == ClickEvent.Action.SUGGEST_COMMAND));
+    }
+
+    @Test
+    void copyableInfoKeepsClickOnValueOnly() {
+        Component info = Messages.copyableInfo("SHA-256", "abcdef");
+
+        assertNull(info.clickEvent());
+        assertEquals(1, info.children().size());
+        assertTextClick(
+                info.children().getFirst(),
+                ClickEvent.Action.COPY_TO_CLIPBOARD,
+                "abcdef"
         );
     }
 
@@ -142,6 +235,41 @@ class MessagesTest {
         assertTextClick(component, ClickEvent.Action.RUN_COMMAND, expectedCommand);
     }
 
+    private static void assertHasTextClick(
+            Component component,
+            ClickEvent.Action<?> expectedAction,
+            String expectedValue
+    ) {
+        assertTrue(component.children().stream().anyMatch(child -> clickMatches(
+                child,
+                expectedAction,
+                expectedValue
+        )));
+    }
+
+    private static boolean hasClickValue(Component component, String expectedValue) {
+        return component.children().stream().anyMatch(child -> {
+            ClickEvent<?> clickEvent = child.clickEvent();
+            if (clickEvent == null || !(clickEvent.payload() instanceof ClickEvent.Payload.Text payload)) {
+                return false;
+            }
+            return expectedValue.equals(payload.value());
+        });
+    }
+
+    private static boolean clickMatches(
+            Component component,
+            ClickEvent.Action<?> expectedAction,
+            String expectedValue
+    ) {
+        ClickEvent<?> clickEvent = component.clickEvent();
+        if (clickEvent == null || clickEvent.action() != expectedAction
+                || !(clickEvent.payload() instanceof ClickEvent.Payload.Text payload)) {
+            return false;
+        }
+        return expectedValue.equals(payload.value());
+    }
+
     private static void assertTextClick(
             Component component,
             ClickEvent.Action<?> expectedAction,
@@ -151,5 +279,22 @@ class MessagesTest {
         assertEquals(expectedAction, clickEvent.action());
         ClickEvent.Payload.Text payload = assertInstanceOf(ClickEvent.Payload.Text.class, clickEvent.payload());
         assertEquals(expectedValue, payload.value());
+    }
+
+    private static DraftManifest nativeManifest() {
+        return DraftManifest.nativeDraft(
+                UUID.fromString("123e4567-e89b-12d3-a456-426614174000"),
+                Instant.parse("2026-07-14T12:00:00Z"),
+                new DraftManifest.Actor("Author", UUID.fromString("223e4567-e89b-12d3-a456-426614174000")),
+                "Book Author",
+                2,
+                24,
+                new ContentFingerprint(
+                        12L,
+                        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+                ),
+                "rules.txt",
+                "rules.txt"
+        );
     }
 }

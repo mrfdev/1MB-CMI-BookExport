@@ -35,6 +35,34 @@ final class BookFileStore {
             String content,
             int maximumFilenameLength
     ) throws IOException, BookExportException {
+        return writeUnique(directory, baseName, content, maximumFilenameLength, null);
+    }
+
+    static synchronized Path writeUnique(
+            Path directory,
+            String baseName,
+            String content,
+            int maximumFilenameLength,
+            String reservedCompanionSuffix
+    ) throws IOException, BookExportException {
+        return writeUnique(
+                directory,
+                baseName,
+                content,
+                maximumFilenameLength,
+                reservedCompanionSuffix,
+                null
+        );
+    }
+
+    static synchronized Path writeUnique(
+            Path directory,
+            String baseName,
+            String content,
+            int maximumFilenameLength,
+            String reservedCompanionSuffix,
+            String creationMarkerSuffix
+    ) throws IOException, BookExportException {
         ensureDirectory(directory);
         Path temporaryFile = null;
         try {
@@ -44,7 +72,9 @@ final class BookFileStore {
                     temporaryFile,
                     directory,
                     baseName,
-                    maximumFilenameLength
+                    maximumFilenameLength,
+                    reservedCompanionSuffix,
+                    creationMarkerSuffix
             );
         } finally {
             if (temporaryFile != null) {
@@ -76,17 +106,72 @@ final class BookFileStore {
             int maximumFilenameLength,
             Clock clock
     ) throws IOException, BookExportException {
+        return publish(
+                stagingDirectory,
+                publishedDirectory,
+                archiveDirectory,
+                backupDirectory,
+                requestedFilename,
+                collisionMode,
+                maximumFilenameLength,
+                clock,
+                null
+        );
+    }
+
+    static synchronized PublishResult publish(
+            Path stagingDirectory,
+            Path publishedDirectory,
+            Path archiveDirectory,
+            Path backupDirectory,
+            String requestedFilename,
+            PublishCollisionMode collisionMode,
+            int maximumFilenameLength,
+            Clock clock,
+            ContentFingerprint expectedFingerprint
+    ) throws IOException, BookExportException {
+        PublishResult liveResult = publishLive(
+                stagingDirectory,
+                publishedDirectory,
+                archiveDirectory,
+                backupDirectory,
+                requestedFilename,
+                collisionMode,
+                maximumFilenameLength,
+                clock,
+                expectedFingerprint
+        );
+        return archivePublished(liveResult, archiveDirectory, clock, expectedFingerprint);
+    }
+
+    static synchronized PublishResult publishLive(
+            Path stagingDirectory,
+            Path publishedDirectory,
+            Path archiveDirectory,
+            Path backupDirectory,
+            String requestedFilename,
+            PublishCollisionMode collisionMode,
+            int maximumFilenameLength,
+            Clock clock,
+            ContentFingerprint expectedFingerprint
+    ) throws IOException, BookExportException {
         ensureDirectory(stagingDirectory);
         ensureDirectory(publishedDirectory);
         ensureDirectory(archiveDirectory);
         ensureDirectory(backupDirectory);
 
         Path stagedPath = resolveStagedFile(stagingDirectory, requestedFilename);
+        verifyExpectedFingerprint(
+                stagedPath,
+                expectedFingerprint,
+                "The staged draft no longer matches the reviewed checksum. Approve its current bytes first."
+        );
         String stagedFilename = stagedPath.getFileName().toString();
         Path existingTarget = findSingleCaseInsensitive(publishedDirectory, stagedFilename);
 
         Path target;
         Path backup = null;
+        ContentFingerprint backupFingerprint = null;
         if (collisionMode == PublishCollisionMode.FAIL) {
             if (existingTarget != null) {
                 throw new BookExportException("A published file already uses " + stagedFilename
@@ -115,6 +200,11 @@ final class BookFileStore {
                     temporaryPublish,
                     "The staged draft changed or could not be verified while preparing publication."
             );
+            verifyExpectedFingerprint(
+                    temporaryPublish,
+                    expectedFingerprint,
+                    "The staged draft changed while publication was being prepared; no live file was changed."
+            );
 
             if (collisionMode == PublishCollisionMode.UNIQUE) {
                 String baseName = stripTextExtension(stagedFilename);
@@ -122,7 +212,8 @@ final class BookFileStore {
                         temporaryPublish,
                         publishedDirectory,
                         baseName,
-                        maximumFilenameLength
+                        maximumFilenameLength,
+                        null
                 );
             } else if (collisionMode == PublishCollisionMode.REPLACE_WITH_BACKUP) {
                 requireRegularFile(target, "Published replacement target");
@@ -131,6 +222,7 @@ final class BookFileStore {
                         backup,
                         "The published replacement target changed after its backup was created."
                 );
+                backupFingerprint = ContentFingerprint.from(backup);
                 publishedPath = moveTemporaryReplacing(temporaryPublish, target);
             } else {
                 try {
@@ -146,15 +238,53 @@ final class BookFileStore {
             }
         }
 
-        verifyPublishedTarget(stagedPath, publishedPath);
-        ArchiveOutcome archive = archiveDraft(stagedPath, archiveDirectory, clock);
+        // The file moved into place is the already verified temporary copy. The
+        // caller checkpoints this committed live outcome before a second read or
+        // any attempt to archive/delete the staged source.
         return new PublishResult(
                 stagedPath,
                 publishedPath,
-                archive.path(),
+                null,
                 backup,
+                backupFingerprint,
                 collisionMode,
-                archive.warning()
+                null,
+                null,
+                null
+        );
+    }
+
+    static synchronized PublishResult archivePublished(
+            PublishResult liveResult,
+            Path archiveDirectory,
+            Clock clock,
+            ContentFingerprint expectedFingerprint
+    ) throws IOException, BookExportException {
+        if (liveResult.archived() || liveResult.hasArchiveWarning()) {
+            throw new IllegalArgumentException("Publication result has already completed archival.");
+        }
+        ensureDirectory(archiveDirectory);
+        verifyPublishedTarget(
+                liveResult.stagedPath(),
+                liveResult.publishedPath(),
+                expectedFingerprint
+        );
+        ArchiveOutcome archive = archiveDraft(
+                liveResult.stagedPath(),
+                archiveDirectory,
+                clock,
+                expectedFingerprint
+        );
+        return new PublishResult(
+                liveResult.stagedPath(),
+                liveResult.publishedPath(),
+                archive.path(),
+                liveResult.backupPath(),
+                liveResult.backupFingerprint(),
+                liveResult.collisionMode(),
+                archive.warning(),
+                liveResult.manifest(),
+                liveResult.manifestWarning()
         );
     }
 
@@ -190,7 +320,7 @@ final class BookFileStore {
         return filename;
     }
 
-    private static Path resolveStagedFile(Path stagingDirectory, String requestedFilename)
+    static Path resolveStagedFile(Path stagingDirectory, String requestedFilename)
             throws IOException, BookExportException {
         String filename = normalizeRequestedTextFilename(requestedFilename);
         Path match = findSingleCaseInsensitive(stagingDirectory, filename);
@@ -219,7 +349,26 @@ final class BookFileStore {
             Path temporaryFile,
             Path directory,
             String baseName,
-            int maximumFilenameLength
+            int maximumFilenameLength,
+            String reservedCompanionSuffix
+    ) throws IOException, BookExportException {
+        return moveTemporaryToUnique(
+                temporaryFile,
+                directory,
+                baseName,
+                maximumFilenameLength,
+                reservedCompanionSuffix,
+                null
+        );
+    }
+
+    private static Path moveTemporaryToUnique(
+            Path temporaryFile,
+            Path directory,
+            String baseName,
+            int maximumFilenameLength,
+            String reservedCompanionSuffix,
+            String creationMarkerSuffix
     ) throws IOException, BookExportException {
         Set<String> occupiedNames = caseInsensitiveNames(directory);
         for (int counter = 0; counter < MAXIMUM_COLLISION_ATTEMPTS; counter++) {
@@ -230,16 +379,38 @@ final class BookFileStore {
                     maximumFilenameLength
             );
             String filename = boundedBase + ".txt";
-            if (occupiedNames.contains(filename)) {
+            if (occupiedNames.contains(filename)
+                    || (reservedCompanionSuffix != null
+                    && occupiedNames.contains(filename + reservedCompanionSuffix))
+                    || (creationMarkerSuffix != null
+                    && occupiedNames.contains(filename + creationMarkerSuffix))) {
                 continue;
             }
 
             Path candidate = directory.resolve(filename).normalize();
             requireDirectChild(directory, candidate);
+            Path creationMarker = creationMarkerSuffix == null
+                    ? null : directory.resolve(filename + creationMarkerSuffix).normalize();
+            if (creationMarker != null) {
+                requireDirectChild(directory, creationMarker);
+                try {
+                    Files.createFile(creationMarker);
+                } catch (FileAlreadyExistsException ignored) {
+                    occupiedNames.add(creationMarker.getFileName().toString());
+                    continue;
+                }
+            }
+            boolean moved = false;
             try {
-                return Files.move(temporaryFile, candidate);
+                Path result = Files.move(temporaryFile, candidate);
+                moved = true;
+                return result;
             } catch (FileAlreadyExistsException ignored) {
                 occupiedNames.add(filename);
+            } finally {
+                if (!moved && creationMarker != null) {
+                    Files.deleteIfExists(creationMarker);
+                }
             }
         }
         throw new BookExportException("Too many files already use this filename.");
@@ -261,6 +432,16 @@ final class BookFileStore {
 
     private static Path copyToHistory(Path source, Path historyDirectory, String kind, Clock clock)
             throws IOException, BookExportException {
+        return copyToHistory(source, historyDirectory, kind, clock, null);
+    }
+
+    private static Path copyToHistory(
+            Path source,
+            Path historyDirectory,
+            String kind,
+            Clock clock,
+            ContentFingerprint expectedFingerprint
+    ) throws IOException, BookExportException {
         String historyBase = historyBaseName(source.getFileName().toString(), kind, clock);
         Path temporaryFile = null;
         Path historyFile = null;
@@ -274,12 +455,18 @@ final class BookFileStore {
                     temporaryFile,
                     historyDirectory,
                     historyBase,
-                    HISTORY_FILENAME_LENGTH
+                    HISTORY_FILENAME_LENGTH,
+                    kind.equals("published") ? DraftManifestStore.MANIFEST_SUFFIX : null
             );
             verifySameContent(
                     source,
                     historyFile,
                     "The " + kind + " copy does not match its source."
+            );
+            verifyExpectedFingerprint(
+                    historyFile,
+                    expectedFingerprint,
+                    "The " + kind + " copy does not match the reviewed checksum."
             );
             return historyFile;
         } catch (IOException | BookExportException exception) {
@@ -298,9 +485,30 @@ final class BookFileStore {
         }
     }
 
-    private static ArchiveOutcome archiveDraft(Path stagedPath, Path archiveDirectory, Clock clock) {
+    private static ArchiveOutcome archiveDraft(
+            Path stagedPath,
+            Path archiveDirectory,
+            Clock clock,
+            ContentFingerprint expectedFingerprint
+    ) {
         try {
-            Path archivedPath = copyToHistory(stagedPath, archiveDirectory, "published", clock);
+            verifyExpectedFingerprint(
+                    stagedPath,
+                    expectedFingerprint,
+                    "The live file was published, but the staged draft changed before archival and was kept."
+            );
+            Path archivedPath = copyToHistory(
+                    stagedPath,
+                    archiveDirectory,
+                    "published",
+                    clock,
+                    expectedFingerprint
+            );
+            verifyExpectedFingerprint(
+                    stagedPath,
+                    expectedFingerprint,
+                    "The live file was published and archived, but the staged draft changed and was kept."
+            );
             try {
                 Files.delete(stagedPath);
                 return new ArchiveOutcome(archivedPath, null);
@@ -362,16 +570,28 @@ final class BookFileStore {
         }
     }
 
-    private static void verifyPublishedTarget(Path stagedPath, Path publishedPath)
+    private static void verifyPublishedTarget(
+            Path stagedPath,
+            Path publishedPath,
+            ContentFingerprint expectedFingerprint
+    )
             throws BookExportException {
         try {
             requireRegularFile(stagedPath, "Staged draft");
             requireRegularFile(publishedPath, "Published target");
-            verifySameContent(
-                    stagedPath,
-                    publishedPath,
-                    "The published target does not match the reviewed staged draft."
-            );
+            if (expectedFingerprint == null) {
+                verifySameContent(
+                        stagedPath,
+                        publishedPath,
+                        "The published target does not match the reviewed staged draft."
+                );
+            } else {
+                verifyExpectedFingerprint(
+                        publishedPath,
+                        expectedFingerprint,
+                        "The published target does not match the reviewed checksum."
+                );
+            }
         } catch (IOException | BookExportException exception) {
             throw new BookExportException(
                     "The live target " + publishedPath.getFileName()
@@ -379,6 +599,16 @@ final class BookFileStore {
                             + "Inspect the live file before retrying.",
                     exception
             );
+        }
+    }
+
+    private static void verifyExpectedFingerprint(
+            Path path,
+            ContentFingerprint expectedFingerprint,
+            String message
+    ) throws IOException, BookExportException {
+        if (expectedFingerprint != null && !expectedFingerprint.matches(path)) {
+            throw new BookExportException(message);
         }
     }
 

@@ -62,6 +62,57 @@ class BookFileStoreTest {
     }
 
     @Test
+    void writeUniqueReservesOrphanManifestCompanionCaseInsensitively() throws Exception {
+        Path output = Files.createDirectories(temporaryDirectory.resolve("output"));
+        Path orphan = writeUtf8(
+                output.resolve("Guide.TXT" + DraftManifestStore.MANIFEST_SUFFIX.toUpperCase(java.util.Locale.ROOT)),
+                "orphan sidecar"
+        );
+
+        Path written = BookFileStore.writeUnique(
+                output,
+                "guide",
+                "new",
+                MAXIMUM_FILENAME_LENGTH,
+                DraftManifestStore.MANIFEST_SUFFIX
+        );
+
+        assertEquals("guide_1.txt", written.getFileName().toString());
+        assertUtf8(orphan, "orphan sidecar");
+        assertUtf8(written, "new");
+        assertNoInternalTemporaryFiles(output);
+    }
+
+    @Test
+    void stagedWriteClaimsCreationMarkerBeforeExposingText() throws Exception {
+        Path output = Files.createDirectories(temporaryDirectory.resolve("output"));
+
+        Path written = BookFileStore.writeUnique(
+                output,
+                "guide",
+                "draft",
+                MAXIMUM_FILENAME_LENGTH,
+                DraftManifestStore.MANIFEST_SUFFIX,
+                DraftManifestStore.CREATION_MARKER_SUFFIX
+        );
+
+        assertUtf8(written, "draft");
+        assertTrue(Files.isRegularFile(DraftManifestStore.markerPath(written)));
+        Files.delete(written);
+
+        Path second = BookFileStore.writeUnique(
+                output,
+                "guide",
+                "second",
+                MAXIMUM_FILENAME_LENGTH,
+                DraftManifestStore.MANIFEST_SUFFIX,
+                DraftManifestStore.CREATION_MARKER_SUFFIX
+        );
+        assertEquals("guide_1.txt", second.getFileName().toString());
+        assertTrue(Files.isRegularFile(DraftManifestStore.markerPath(second)));
+    }
+
+    @Test
     void writeUniqueRejectsTraversalAndCleansTemporaryFile() throws Exception {
         Path output = temporaryDirectory.resolve("output");
 
@@ -179,6 +230,7 @@ class BookFileStoreTest {
         assertFalse(result.hasArchiveWarning());
         assertUtf8(existing, "new 你好");
         assertUtf8(result.backupPath(), "old café");
+        assertEquals(ContentFingerprint.from(result.backupPath()), result.backupFingerprint());
         assertUtf8(result.archivedPath(), "new 你好");
         assertTrue(result.backupPath().getFileName().toString().contains("_backup_GUIDE"));
         assertTrue(result.archivedPath().getFileName().toString().contains("_published_guide"));
@@ -213,6 +265,58 @@ class BookFileStoreTest {
         );
         assertTrue(second.backupPath().getFileName().toString().endsWith("_1.txt"));
         assertTrue(second.archivedPath().getFileName().toString().endsWith("_1.txt"));
+        assertNoInternalTemporaryFiles(directories.all());
+    }
+
+    @Test
+    void archiveNameSkipsAnOrphanManifestCompanion() throws Exception {
+        WorkflowDirectories directories = workflowDirectories();
+        writeUtf8(directories.staging().resolve("guide.txt"), "draft");
+        Path orphan = writeUtf8(
+                directories.archive().resolve(
+                        "20260714-100203-456_published_guide.txt" + DraftManifestStore.MANIFEST_SUFFIX
+                ),
+                "orphan sidecar"
+        );
+
+        PublishResult result = publish(directories, "guide.txt", PublishCollisionMode.FAIL);
+
+        assertEquals(
+                "20260714-100203-456_published_guide_1.txt",
+                result.archivedPath().getFileName().toString()
+        );
+        assertUtf8(orphan, "orphan sidecar");
+        assertUtf8(result.archivedPath(), "draft");
+    }
+
+    @Test
+    void reviewedChecksumMismatchStopsBeforeBackupOrLiveMutation() throws Exception {
+        WorkflowDirectories directories = workflowDirectories();
+        Path staged = writeUtf8(directories.staging().resolve("guide.txt"), "reviewed bytes");
+        ContentFingerprint reviewed = ContentFingerprint.from(staged);
+        writeUtf8(staged, "changed after review");
+        Path published = writeUtf8(directories.published().resolve("guide.txt"), "live bytes");
+
+        BookExportException exception = assertThrows(
+                BookExportException.class,
+                () -> BookFileStore.publish(
+                        directories.staging(),
+                        directories.published(),
+                        directories.archive(),
+                        directories.backups(),
+                        "guide.txt",
+                        PublishCollisionMode.REPLACE_WITH_BACKUP,
+                        MAXIMUM_FILENAME_LENGTH,
+                        FIXED_CLOCK,
+                        reviewed
+                )
+        );
+
+        assertTrue(exception.getMessage().contains("reviewed checksum"));
+        assertUtf8(staged, "changed after review");
+        assertUtf8(published, "live bytes");
+        assertTrue(listRegularFiles(directories.archive()).isEmpty());
+        assertTrue(listRegularFiles(directories.backups()).isEmpty());
         assertNoInternalTemporaryFiles(directories.all());
     }
 

@@ -22,4 +22,17 @@ record BookSnapshot(
     int utf16Units() {
         return pages.stream().mapToInt(String::length).sum();
     }
+
+    /**
+     * Returns content-free diagnostics. Record-generated output would otherwise
+     * include every raw page plus the title and author component serializations.
+     */
+    @Override
+    public String toString() {
+        return "BookSnapshot[signed=" + signed
+                + ", hasTitle=" + !plainTitle.isBlank()
+                + ", hasAuthor=" + !plainAuthor.isBlank()
+                + ", pages=" + pageCount()
+                + ", utf16Units=" + utf16Units() + ']';
+    }
 }

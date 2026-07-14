@@ -4,7 +4,7 @@ BookExport is a Paper 26.2 administration plugin that turns a written book or bo
 
 Fresh installations use a review-first workflow: an author stages a draft, a trusted administrator reviews it, and an administrator publishes it into CMI's CustomText directory. Existing version 2 configurations continue in direct compatibility mode until an administrator deliberately migrates them.
 
-The 2.0.1 build modernizes the original 1.21 plugin with Java 25 bytecode, Paper 26.2 APIs, Adventure messages, Gradle, correct CMI pagination, granular permissions, validated workflow directories, collision-safe publication, diagnostics, and regression tests.
+The 2.0.1 build modernizes the original 1.21 plugin with Java 25 bytecode, Paper 26.2 APIs, Adventure messages, Gradle, correct CMI pagination, granular permissions, validated workflow directories, collision-safe publication, content-free draft manifests, diagnostics, and regression tests.
 
 ## Compatibility
 
@@ -13,15 +13,15 @@ The 2.0.1 build modernizes the original 1.21 plugin with Java 25 bytecode, Paper
 | Server | Paper 26.2 only |
 | Compile API | `io.papermc.paper:paper-api:26.2.build.60-beta` |
 | Java bytecode | Java 25 |
-| Tested runtime | Oracle Java 26.0.1 |
+| Tested runtimes | Oracle Java 25.0.2 and 26.0.1 |
 | Build tool | Gradle 9.4.1 wrapper |
-| BookExport | `2.0.1` (repository build `014`) |
+| BookExport | `2.0.1` (repository build `015`) |
 
 Older Minecraft, Paper, Spigot, and Java releases are intentionally unsupported.
 
 ## Feature introduction
 
-Use Minecraft's book editor as an in-game content authoring tool. Hold a finished book and run `/bookexport`. On a fresh installation, BookExport writes a staged draft for staff review instead of immediately changing a live CMI text. A publisher can inspect the draft outside Minecraft, list it in-game, and publish it with an explicit command.
+Use Minecraft's book editor as an in-game content authoring tool. Hold a finished book and run `/bookexport`. On a fresh installation, BookExport writes a staged draft for staff review instead of immediately changing a live CMI text. A publisher can inspect the draft outside Minecraft, verify its content-free manifest in-game, record an approval or changes request, and publish it with an explicit command.
 
 With the default CMI profile, the result starts with `<AutoPage>` and places `<NextPage>` only between Minecraft pages, so CMI page 1 matches Minecraft page 1.
 
@@ -39,8 +39,14 @@ Typical uses include:
 - Uses the signed title automatically or an explicit custom title.
 - Provides unambiguous `/bookexport export [title]` and `/bookexport stage [title]` routes for titles that match subcommands.
 - Stages normal exports by default on config version 3; explicit `stage` always stages, even in direct mode.
+- Creates an atomic `<draft>.bookexport-manifest.properties` sidecar for each managed staged draft.
+- Claims a content-free `<draft>.bookexport-creating` marker before exposing a native staged `.txt`, so an interrupted pair creation fails closed instead of being mistaken for a legacy draft.
+- Records stable manifest ID, origin, intended and actual filenames, creator/adopter and book-author metadata, UTC creation/adoption time, page/unit/byte counts, and SHA-256 without storing page content.
+- Records exact review and publication states, actors, timestamps, checksums, collision mode, final filename, archive, backup, and outcome.
+- Provides review, approval, changes-requested, and paginated history commands while keeping approval recommended and publication backward compatible.
 - Publishes reviewed drafts with `fail`, `unique`, or backed-up `replace` collision behavior.
-- Runs the archive step after every successful publication and retains a draft when publication or archiving cannot complete safely.
+- Detects managed drafts changed after staging or approval and blocks unsafe publication until their manifest is reviewed and approved again.
+- Attempts an atomic manifest checkpoint immediately after each committed live publication and before archival; a stored pending record blocks repeat publication, and an archival failure retains the draft.
 - Preserves page order and page boundaries without reflowing or truncating valid book content.
 - Produces correct CMI pagination: controlled `<AutoPage>` first line and `<NextPage>` only between pages.
 - Preserves CMI and PlaceholderAPI-looking tokens for CMI to resolve for the eventual viewer.
@@ -48,7 +54,7 @@ Typical uses include:
 - Uses normalized Unicode-aware filenames with configurable templates, lowercasing, length limits, and collision suffixes.
 - Writes complete UTF-8 temporary files before collision-safe moves.
 - Lists published, staged, archived, or backup files with chat-safe pagination and clickable controls for players.
-- Makes staged Publish controls suggest an explicit `fail` command for review instead of executing it immediately.
+- Shows staged review status and safe Review, Approve, Changes, and Publish suggestions without executing a mutating action immediately.
 - Validates all workflow paths and configuration during startup and reload.
 - Offers player-safe `info` and `help`, plus trusted `admin` and `debug` diagnostics.
 - Retains the old `exportbook.*` permission nodes as compatibility aliases.
@@ -78,18 +84,18 @@ Do not add these plugins to BookExport's Gradle dependencies unless BookExport l
    ./gradlew clean build
    ```
 
-2. Copy `build/libs/1MB-BookExport-v2.0.1-014-j25-26.2.jar` to the Paper 26.2 server's `plugins/` directory.
+2. Copy `build/libs/1MB-BookExport-v2.0.1-015-j25-26.2.jar` to the Paper 26.2 server's `plugins/` directory.
 3. Remove any older BookExport JAR so Paper does not discover two copies.
 4. Restart Paper cleanly. Do not use Bukkit `/reload` or a hot-reload plugin.
 5. Confirm `/version BookExport` reports `2.0.1`.
-6. Confirm `/bookexport info` reports build `014`.
+6. Confirm `/bookexport info` reports build `015`.
 7. Run `/bookexport admin status` and verify config version 3, workflow `staged`, four writable workflow directories, and collision mode `fail`.
 
 If the server already has a version 2 `config.yml`, BookExport intentionally starts in direct compatibility mode. It does not rewrite the config or move existing files. Follow [Migrating a version 2 configuration](#migrating-a-version-2-configuration) when ready to enable staged-by-default exports.
 
 ## Admin-player quick start
 
-1. Give a trusted staff player the non-destructive master node:
+1. Give a trusted staff player the non-replacing master node:
 
    ```text
    /lp user <player> permission set bookexport.admin true
@@ -108,19 +114,28 @@ If the server already has a version 2 `config.yml`, BookExport intentionally sta
    /bookexport stage Server Rules
    ```
 
-5. Review the generated draft and list it in-game:
+5. List the generated draft, then inspect its manifest and verify its current SHA-256:
 
    ```text
    /bookexport list staged
+   /bookexport admin review server_rules.txt
    ```
 
-6. Click the draft's Publish action. It fills in a command but does not run it. Review the command and press Enter, or type it directly:
+6. After reviewing the `.txt` content, record approval of its current bytes:
+
+   ```text
+   /bookexport admin approve server_rules.txt
+   ```
+
+   Approval is recommended but deliberately non-blocking for an unchanged unreviewed or older untracked draft. If a managed draft changes, is marked changes-requested, or has a corrupt manifest, BookExport blocks publication until it is reviewed and approved or repaired.
+
+7. Click the draft's Publish action. It fills in a command but does not run it. Review the command and press Enter, or type it directly:
 
    ```text
    /bookexport admin publish server_rules.txt fail
    ```
 
-7. Reload CMI and open the published text:
+8. Reload CMI and open the published text:
 
    ```text
    /cmi reload
@@ -128,6 +143,8 @@ If the server already has a version 2 `config.yml`, BookExport intentionally sta
    ```
 
 BookExport never runs `/cmi reload` automatically.
+
+An unchanged unreviewed or legacy draft remains publishable for compatibility. That publication records the publisher as the implicit approving actor, including the exact published SHA-256. Explicit approval is still the recommended staff workflow because it makes the review boundary and reviewed bytes visible before publication.
 
 The `bookexport.admin` master node does **not** include `bookexport.admin.replace`. Grant the latter separately only to administrators who may replace a live text after BookExport creates a backup.
 
@@ -147,6 +164,11 @@ Only grant export access to trusted authors. Book content is intentionally prese
 | `/bookexport admin [status]` | Show validated workflow settings and directory health | `bookexport.admin.status` |
 | `/bookexport admin list [page]` | List published `.txt` files; published is the backward-compatible default scope | `bookexport.admin.list` |
 | `/bookexport admin list <published\|staged\|archive\|backups> [page]` | List files in an explicit workflow scope | Matching `bookexport.admin.list...` permission |
+| `/bookexport admin review <staged-file>` | Show the draft manifest, review state, and current integrity without displaying content | `bookexport.admin.review` |
+| `/bookexport admin approve <staged-file>` | Approve the draft's current SHA-256; later changes invalidate that approval | `bookexport.admin.approve` |
+| `/bookexport admin changes <staged-file>` | Mark a managed draft changes-requested and revoke its approval | `bookexport.admin.approve` |
+| `/bookexport admin history [page]` | List pending/finalized publication records newest first | `bookexport.admin.history` |
+| `/bookexport admin history show <manifest-id>` | Show one retained publication record by its stable UUID | `bookexport.admin.history` |
 | `/bookexport admin publish <staged-file> [fail\|unique\|replace]` | Publish a staged draft; omitted mode uses `publish-collision-mode` | `bookexport.admin.publish`; `replace` also needs `bookexport.admin.replace` |
 | `/bookexport admin reload` | Reload and validate `config.yml` | `bookexport.admin.reload` |
 | `/bookexport admin debug [runtime\|book\|cmi\|workflow\|preview]` | Show read-only diagnostics | `bookexport.admin.debug` |
@@ -159,9 +181,9 @@ Only grant export access to trusted authors. Book content is intentionally prese
 | `/bookexport debug workflow` | Show config compatibility mode, workflow directories, counts, and collision mode | `bookexport.admin.debug` |
 | `/bookexport debug preview [title]` | Preview destination scope, sanitized filename candidate, pages, UTF-16 units, and bytes without writing | `bookexport.admin.debug`; a custom title also needs `bookexport.export.custom-title` |
 
-All information, administration, list, publish, and debug commands work from the console except held-book inspection, preview, and export/stage.
+All information, administration, review, history, list, publish, and debug commands work from the console except held-book inspection, preview, and export/stage.
 
-When multiple list pages exist, player Previous/Next controls run the adjacent list command and preserve the selected scope. A filename can be clicked to copy it. A staged row's Publish action suggests `/bookexport admin publish <file> fail`; it never mutates files until the sender submits the command, and it never inherits a configured replacement policy. Console output remains readable, and console publishers type the explicit command manually.
+When multiple list pages exist, player Previous/Next controls run the adjacent list command and preserve the selected scope. A filename can be clicked to copy it. Staged rows identify unreviewed, approved, changes-requested, changed, already-published, association-mismatch, missing, corrupt, or legacy state and expose only actions the sender may use. Review is read-only; Approve, Changes, and Publish controls suggest commands for deliberate submission. Publish continues to suggest `/bookexport admin publish <file> fail`, never executes immediately, and never inherits a configured replacement policy. Console output remains readable, and console publishers type the explicit command manually.
 
 ## Command examples
 
@@ -195,6 +217,15 @@ When multiple list pages exist, player Previous/Next controls run the adjacent l
 /bookexport admin list archive 1
 /bookexport admin list backups
 
+# Inspect, approve, or request changes without exposing draft content
+/bookexport admin review july_news.txt
+/bookexport admin approve july_news.txt
+/bookexport admin changes july_news.txt
+
+# Browse content-free manifest history and inspect a stable record
+/bookexport admin history 2
+/bookexport admin history show 123e4567-e89b-12d3-a456-426614174000
+
 # Publish only when no case-insensitive target exists
 /bookexport admin publish july_news.txt fail
 
@@ -212,7 +243,7 @@ When multiple list pages exist, player Previous/Next controls run the adjacent l
 
 | Permission | Default | Purpose |
 | --- | --- | --- |
-| `bookexport.admin` | OP | Grants every documented non-destructive capability, including staging, scoped lists, and non-replacing publication; deliberately excludes replacement |
+| `bookexport.admin` | OP | Grants every documented non-replacing capability, including staging, review decisions, history, scoped lists, and publication; deliberately excludes replacement |
 | `bookexport.export` | OP | Process the held book through the configured workflow or explicit `stage` route |
 | `bookexport.export.custom-title` | OP | Override the signed title or name a writable-book export |
 | `bookexport.info` | Everyone | View public plugin and compatibility information |
@@ -222,6 +253,9 @@ When multiple list pages exist, player Previous/Next controls run the adjacent l
 | `bookexport.admin.list.staged` | OP | List staged draft filenames and receive publish suggestions |
 | `bookexport.admin.list.archive` | OP | List archived draft filenames |
 | `bookexport.admin.list.backups` | OP | List replacement backup filenames |
+| `bookexport.admin.review` | OP | View manifest metadata, review state, and current checksum integrity |
+| `bookexport.admin.approve` | OP | Approve the current draft bytes or mark a draft changes-requested |
+| `bookexport.admin.history` | OP | List and inspect retained publication records |
 | `bookexport.admin.publish` | OP | Publish staged drafts with `fail` or `unique`, and enter the publish workflow |
 | `bookexport.admin.replace` | False | Use the backed-up `replace` collision mode; independent and not inherited by `bookexport.admin` |
 | `bookexport.admin.reload` | OP | Reload configuration |
@@ -231,7 +265,7 @@ Legacy aliases remain available for existing LuckPerms data:
 
 | Legacy node | Default | Grants |
 | --- | --- | --- |
-| `exportbook.command` | False | `bookexport.admin`, therefore every non-destructive capability but not `bookexport.admin.replace` |
+| `exportbook.command` | False | `bookexport.admin`, therefore every non-replacing capability but not `bookexport.admin.replace` |
 | `exportbook.export` | False | `bookexport.export` and `bookexport.export.custom-title` |
 | `exportbook.list` | False | Published listing through `bookexport.admin.list` |
 | `exportbook.help` | False | `bookexport.help` |
@@ -261,6 +295,42 @@ Fresh config version 3 files default to `staged`. Existing version 2 files load 
 
 `/bookexport list [page]` and `/bookexport admin list [page]` continue to mean the published scope for backward compatibility.
 
+Manifest sidecars are workflow metadata rather than a fifth `.txt` scope. They are excluded from normal file lists and are never copied into CMI's CustomText directory.
+
+### Draft manifests and review state
+
+A managed staged file such as `server_rules.txt` has a strict UTF-8 properties sidecar named `server_rules.txt.bookexport-manifest.properties`. The sidecar uses schema version 1, a monotonically increasing revision, and a stable UUID so its record remains unambiguous even when `unique` publication changes the final filename or a later draft reuses the intended filename.
+
+Each manifest records content-free provenance and integrity data:
+
+| Group | Recorded fields |
+| --- | --- |
+| Identity | Schema version, stable manifest UUID, revision, and `native` or `legacy-adopted` origin |
+| Names | Intended filename and actual staged filename |
+| Source | Native creator name/UUID, signed book author when present, and UTC creation time; a legacy record instead identifies the adopter and adoption time |
+| Size | Source pages, Java UTF-16 units, and rendered UTF-8 bytes; unavailable legacy source counts remain explicitly unknown |
+| Initial integrity | SHA-256 of the staged `.txt` bytes |
+| Review | `unreviewed`, `approved`, or `changes-requested`; decision actor/time, exact reviewed byte count and SHA-256, and whether approval was implicit |
+| Publication | `staged`, `published-archive-pending`, or `published`; publisher, UTC publication time, collision mode, and final filename |
+| Outcome | Published SHA-256 (the exact effective review fingerprint), archive filename, and replacement backup filename/byte count/SHA-256 when applicable |
+
+The manifest never contains Minecraft page text or the rendered CustomText body. Server-log audit messages likewise omit those bodies; they intentionally include private metadata such as filenames, actors, stable IDs, counts, and checksums.
+
+Review is recommended, not a new mandatory step for every existing workflow:
+
+- A newly staged managed draft starts `unreviewed` with publication state `staged`.
+- `/bookexport admin review <file>` recalculates integrity and shows manifest metadata without showing the draft body.
+- `/bookexport admin approve <file>` approves its current bytes and stores the reviewing actor, time, and SHA-256.
+- `/bookexport admin changes <file>` records changes-requested and revokes approval. It must be approved before publication.
+- An unchanged `unreviewed` managed draft may still be published for compatibility. Publication records the publisher as the implicit approving actor.
+- A staged legacy `.txt` file without a sidecar may still be published. Its new record uses a legacy origin, preserves unknown source fields as unknown, and records the publisher's implicit approval.
+- If a managed draft's bytes no longer match the checksum that defines its current review state, publication stops and retains the draft until an administrator reviews and approves the changed bytes.
+- A corrupt managed manifest fails closed. Repair or restore the sidecar before publication; BookExport does not silently treat it as an untracked legacy file.
+- A malformed or case-ambiguous active sidecar is omitted only from history discovery so unrelated valid publication records remain listable. Direct review, approval, changes, and publication still fail closed for that draft, and status counts the error.
+- A leftover `.bookexport-creating` marker also fails closed. It identifies an interrupted native stage operation whose source metadata must not be silently replaced by legacy adoption.
+
+`/bookexport admin history [page]` lists retained pending or finalized publication records newest first. `/bookexport admin history show <manifest-id>` shows the content-free lifecycle metadata, including whether archival is still pending, the final filename, and the publication outcome.
+
 ### Publication and collisions
 
 The optional command mode overrides the configured `publish-collision-mode` for that one publication. Command `replace` maps to configuration value `replace-with-backup`.
@@ -273,7 +343,7 @@ The optional command mode overrides the configured `publish-collision-mode` for 
 
 Publication copies the complete staged content to a temporary file in the published directory before the final move. It rejects traversal, ambiguous case-insensitive matches, non-regular files, and symbolic-link staged candidates.
 
-After successful publication, BookExport creates a timestamped archive and removes the staged copy. If archiving fails, publication remains successful, a warning is reported, and the draft is retained when possible. A failed publication never consumes the staged draft.
+Immediately after the verified live move, BookExport atomically writes a `published-archive-pending` manifest checkpoint before it archives or deletes staged content. It then creates a timestamped archive, removes the staged `.txt`, and finalizes the history sidecar with the final filename, checksum, publisher, collision mode, backup, archive, and outcome. The manifest sidecar never enters CMI. If checkpoint storage itself fails after the live move, the live publication has still succeeded, the staged draft is kept, archival is skipped, and the operator is warned not to retry. If archiving or finalization fails after a checkpoint, publication remains successful, the checkpoint blocks accidental republishing, a warning is reported, and the retained pending record remains available in history. A failed pre-publication operation never consumes the staged draft. This checkpoint is an audit safeguard, not the cross-process lock or full crash-recovery journal listed in the backlog.
 
 BookExport deliberately does not execute `/cmi reload`; an administrator remains responsible for reviewing the published file and refreshing CMI.
 
@@ -367,6 +437,8 @@ BookExport therefore:
 | `list-page-size` | `10` | Filenames shown per list page, clamped to 1-50 |
 | `debug-logging` | `false` | Log content-free export and publication statistics |
 
+Build 015 keeps `config-version: 3` and adds no manifest or approval configuration keys. Managed sidecars are automatic for staged drafts, and explicit approval remains recommended rather than globally required so unchanged `unreviewed` and legacy drafts keep their compatible publication behavior.
+
 ### Path resolution and validation
 
 - `staging` becomes `plugins/BookExport/staging/`.
@@ -375,6 +447,8 @@ BookExport therefore:
 - A relative path containing `..` may not escape `plugins/BookExport/`.
 - Staging, published, archive, and backup directories must all be writable and resolve to distinct, non-overlapping locations.
 - Workflow directories may not be symbolic links. Staged publication candidates must be direct, regular, non-symbolic-link `.txt` files.
+- A managed manifest is a direct sibling of its staged `.txt`; BookExport does not follow a manifest symbolic link or accept a sidecar associated with another path.
+- Manifest and creation-marker associations are resolved case-insensitively, and ambiguous case variants fail closed on case-sensitive filesystems.
 - Startup fails safely when a configured workflow directory cannot be created, validated, or written.
 - A rejected reload leaves the previous validated runtime settings active.
 
@@ -429,11 +503,16 @@ Hex input is validated before conversion. Malformed sequences are treated as tex
 
 - `servers/`, build output, caches, logs, IDE files, and local OS metadata are excluded by `.gitignore`.
 - Debug output reports sizes and selected validated settings, never page text, server secrets, or the full configuration file.
-- Admin status and scoped lists can expose filesystem paths or private draft filenames and are OP-only by default.
-- Staged-filename tab completion requires both publication and staged-list permission, so publish-only users cannot enumerate private draft names.
+- Manifests and server-log audit records contain metadata and SHA-256 values, never book pages or the rendered CustomText body.
+- Manifest metadata includes player names, UUIDs, the signed book author, filenames, and timestamps. Treat sidecars as private staff records even though they contain no page content.
+- Admin status, review/history output, and scoped lists can expose filesystem paths, private draft filenames, or author metadata and are OP-only by default.
+- Staged-filename tab completion requires the relevant review, approval, or publication permission together with staged-list permission, so action-only users cannot enumerate private draft names.
 - Book metadata can include player name, author, export time, and size statistics when configured. Filename templates can separately include the player's UUID.
 - Staging creates a review boundary; it does not make author content safe. CMI actions, placeholders, or reserved directives can become active after publication.
 - The staged-list Publish action suggests an explicit `fail` command rather than silently executing it or inheriting a replacement default.
+- Review is read-only; Approve, Changes, and Publish are confirmation-oriented suggested commands. An approval is tied to one exact checksum.
+- A corrupt managed sidecar fails closed instead of being downgraded to an untracked legacy draft.
+- Invalid active sidecars cannot suppress unrelated valid history records; they remain blocked from every direct or mutating draft operation and are counted by status health.
 - Replacement requires an independent permission, always creates a backup, and is excluded from both master nodes.
 - Publication rejects path traversal, symlink candidates, ambiguous case-insensitive matches, and non-regular files.
 
@@ -459,7 +538,7 @@ The main artifact uses this naming scheme:
 1MB-BookExport-v<version>-<build>-j<java>-<minecraft>.jar
 ```
 
-For this release, build `014` is the zero-padded repository commit ordinal: thirteen commits existed before the staged-workflow release commit.
+For this release, build `015` is the zero-padded repository commit ordinal: fourteen commits existed before the manifest/review release commit.
 
 For runtime validation, use [checklist-bookexport.md](checklist-bookexport.md). Planned hardening and feature ideas are tracked in [feature-improvements-bookexport.md](feature-improvements-bookexport.md).
 
@@ -479,7 +558,31 @@ Writable books have no signed title. Use `/bookexport stage <title>` or `/bookex
 
 ### The command says staged, but the CMI text does not appear
 
-Staging does not change the published directory. Review `/bookexport list staged`, publish the draft, confirm `/bookexport list published`, then run `/cmi reload`.
+Staging does not change the published directory. Review `/bookexport list staged`, inspect `/bookexport admin review <file>`, approve the reviewed bytes when appropriate, publish the draft, confirm `/bookexport list published`, then run `/cmi reload`.
+
+### An unreviewed or legacy draft published without `/bookexport admin approve`
+
+This is intentional compatibility behavior. Explicit approval is recommended but non-blocking for an unchanged `unreviewed` managed draft or an older untracked `.txt`. BookExport records the publisher as the implicit approving actor and stores the exact published checksum in the review decision.
+
+### Publication says the managed draft changed
+
+The current `.txt` bytes no longer match the checksum that defines the draft's review state. The draft was kept. Inspect it again with `/bookexport admin review <file>`, then run `/bookexport admin approve <file>` to approve the current bytes or restore the reviewed version.
+
+### Publication says the manifest is corrupt
+
+BookExport fails closed for a managed sidecar and does not pretend it is a legacy draft. Restore or repair `<draft>.bookexport-manifest.properties`, verify it with the review command, and approve the current draft before retrying. Do not delete the sidecar merely to bypass its recorded integrity state.
+
+### A staged draft reports incomplete creation
+
+BookExport found `<draft>.bookexport-creating`, which means the server or filesystem operation stopped after reserving a native draft name but before completing its manifest pair. Do not publish or delete the marker as a bypass. Inspect the staged file and logs; remove both incomplete files only when you have intentionally abandoned that stage attempt, then export the original book again to preserve author, timestamp, page, and checksum provenance.
+
+### A staged row says changes requested
+
+A reviewer used `/bookexport admin changes <file>`. Review the revised `.txt`, then explicitly approve its current bytes before publication.
+
+### I need the result of an older publication
+
+Run `/bookexport admin history [page]`, copy the stable manifest UUID, and use `/bookexport admin history show <manifest-id>`. The record reports final filename, checksum, actor, collision mode, archive, backup, and outcome without displaying content.
 
 ### This upgraded server still exports directly
 

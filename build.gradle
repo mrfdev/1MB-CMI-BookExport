@@ -5,8 +5,8 @@ plugins {
 def pluginName = 'BookExport'
 def artifactBaseName = '1MB-BookExport'
 def pluginVersion = '2.0.1'
-// Thirteen commits precede this release; its release commit is repository build 014.
-def buildNumber = '014'
+// Fourteen commits precede this release; its release commit is repository build 015.
+def buildNumber = '015'
 def javaTarget = 25
 def paperTarget = '26.2'
 def paperApiVersion = '26.2.build.60-beta'

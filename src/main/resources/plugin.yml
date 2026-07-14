@@ -10,11 +10,11 @@ commands:
   bookexport:
     aliases: [bexport]
     description: Stage or export the held book, or inspect and administer BookExport.
-    usage: /bookexport [export|stage|info|help|admin|debug|list|reload]
+    usage: /bookexport [export|stage|info|help|list|reload|debug|admin <status|list|review|approve|changes|publish|history|reload|debug>]
 
 permissions:
   bookexport.admin:
-    description: Grants all non-destructive BookExport administration and export capabilities.
+    description: Grants all non-replacing BookExport administration and export capabilities.
     default: op
     children:
       bookexport.export: true
@@ -26,7 +26,10 @@ permissions:
       bookexport.admin.list.staged: true
       bookexport.admin.list.archive: true
       bookexport.admin.list.backups: true
+      bookexport.admin.review: true
+      bookexport.admin.approve: true
       bookexport.admin.publish: true
+      bookexport.admin.history: true
       bookexport.admin.reload: true
       bookexport.admin.debug: true
 
@@ -66,6 +69,14 @@ permissions:
     description: Allows listing replacement backup filenames.
     default: op
 
+  bookexport.admin.review:
+    description: Allows viewing staged-draft manifest metadata and checksum integrity.
+    default: op
+
+  bookexport.admin.approve:
+    description: Allows approving exact staged-draft bytes or requesting changes.
+    default: op
+
   bookexport.admin.publish:
     description: Allows publishing staged drafts without destructive replacement.
     default: op
@@ -73,6 +84,10 @@ permissions:
   bookexport.admin.replace:
     description: Allows replacing a published file after creating a backup.
     default: false
+
+  bookexport.admin.history:
+    description: Allows viewing manifest-backed publication history and audit metadata.
+    default: op
 
   bookexport.admin.reload:
     description: Allows reloading and validating BookExport configuration.
