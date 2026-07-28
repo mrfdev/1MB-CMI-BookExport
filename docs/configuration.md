@@ -41,8 +41,8 @@ exist.
 | Review, approval, archive, and replacement backup | Available for staged drafts | Available only for drafts created with the explicit `stage` route |
 
 A direct export does not create a draft manifest, archive, or replacement backup.
-It is retained for existing installations, but `staged` is the safer authoring
-default.
+It also does not create a publication transaction journal. Direct mode is retained
+for existing installations, but `staged` is the safer authoring default.
 
 ### Publication collision modes
 
@@ -106,8 +106,10 @@ before the first source page and is normally incorrect for CMI.
   be a symbolic link.
 - Missing directories are created. Each is tested with a temporary writable probe
   and canonicalized before use.
-- Staging, published, archive, and backup directories must be distinct. They may
-  not be equal, nested inside one another, or contain one another.
+- Staging, published, archive, backup, and the fixed internal `transactions`
+  directory must be distinct. They may not be equal, nested inside one another,
+  or contain one another. `transactions` is not configurable and remains below
+  `plugins/BookExport/`.
 - Staged publication accepts only a direct, regular, non-symbolic-link `.txt` file.
   Case-ambiguous filenames and manifest associations fail closed.
 
@@ -123,7 +125,8 @@ Use:
 ```
 
 The command rereads YAML into a new configuration object, applies packaged defaults,
-validates every value and all four workflow directories, and swaps runtime settings
+validates every value, all four configurable workflow directories, and the fixed
+transaction directory, and swaps runtime settings
 only after the complete candidate succeeds. Successful reload clears the recorded
 last failure. Invalid YAML, unsupported schema values, invalid workflow or collision
 values, unsafe or overlapping paths, and unwritable directories reject the candidate;
@@ -152,14 +155,14 @@ To adopt the version 3 staged workflow:
 2. Add `workflow-mode`, `staging-directory`, `archive-directory`,
    `backup-directory`, and `publish-collision-mode`, using the defaults above as a
    safe starting point.
-3. Confirm all four resolved workflow directories are writable, distinct, and
-   non-overlapping.
+3. Confirm all four configured workflow directories and BookExport's fixed
+   `transactions` directory are writable, distinct, and non-overlapping.
 4. Set `config-version: 3` last.
 5. Restart Paper, or use `/bookexport admin reload` when only valid configuration
    values changed.
 6. Confirm `/bookexport admin status` and `/bookexport debug workflow` report
-   configuration version 3, compatibility mode `false`, workflow `staged`, and four
-   writable directories.
+   configuration version 3, compatibility mode `false`, workflow `staged`, writable
+   directories, and a clear recovery journal.
 7. Stage, review, approve, publish, and inspect a disposable test book before using
    the workflow for production text.
 
@@ -179,10 +182,12 @@ plugins/
       <draft>.txt.bookexport-manifest.properties
       <draft>.txt.bookexport-creating       # transient; present after an interrupted stage
     archive/
-      <timestamp>_published_<draft>.txt
-      <timestamp>_published_<draft>.txt.bookexport-manifest.properties
+      <timestamp>_published_<draft>_<transaction-uuid>.txt
+      <timestamp>_published_<draft>_<transaction-uuid>.txt.bookexport-manifest.properties
     backups/
-      <timestamp>_backup_<published>.txt
+      <timestamp>_backup_<published>_<transaction-uuid>.txt
+    transactions/
+      <transaction-uuid>.bookexport-transaction.properties # present only while incomplete/residual
   CMI/
     CustomText/
       <published>.txt
@@ -199,8 +204,20 @@ publications retain an archive and finalized history sidecar. Replacement backup
 remain until an administrator removes them. Pending publication checkpoints remain
 in staging when archival or finalization cannot safely complete.
 
+Before a reviewed staged publication can mutate a backup or live file, BookExport
+atomically stores a content-free transaction record. It contains IDs, state and
+revision, timestamps, publisher identity, collision mode, basename-only intended,
+staged, published, archive, and optional backup filenames, byte counts, SHA-256
+values, and a checksum of the configured workflow roots. It never contains book
+pages or rendered CustomText. Normal finalization records `finalized` and removes
+the temporary journal; an interrupted or uncertain operation leaves it for
+read-only startup and command inspection. Back up `transactions/` together with
+staging, archive, backups, and the configured published directory as one recovery
+set.
+
 Prune only under an administrator-controlled retention policy after taking a backup
 and confirming no publication is active. Keep an archived `.txt` and its matching
 manifest sidecar together; deleting one makes the content or audit history incomplete.
-Do not delete an active or archive-pending manifest merely to bypass an integrity
-failure. There is no in-game prune or rollback command.
+Do not delete an active or archive-pending manifest or a residual transaction merely
+to bypass an integrity failure. Recovery list/show commands do not mutate files,
+and there is no in-game prune, retry, repair, rollback, or cleanup command.

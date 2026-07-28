@@ -14,6 +14,10 @@ record BuildInfo(
         String javaTarget,
         String paperTarget,
         String paperApiVersion,
+        String paperBuild,
+        String paperChannel,
+        String paperServerJarFileName,
+        String paperServerSha256,
         String docsUrl,
         String sourceUrl
 ) {
@@ -37,6 +41,10 @@ record BuildInfo(
                 properties.getProperty("javaTarget", "unknown"),
                 properties.getProperty("paperTarget", "unknown"),
                 properties.getProperty("paperApiVersion", "unknown"),
+                properties.getProperty("paperBuild", "unknown"),
+                properties.getProperty("paperChannel", "unknown"),
+                properties.getProperty("paperServerJarFileName", "unknown"),
+                properties.getProperty("paperServerSha256", "unknown"),
                 properties.getProperty("docsUrl", CANONICAL_DOCS_URL),
                 properties.getProperty("sourceUrl", plugin.getPluginMeta().getWebsite())
         );

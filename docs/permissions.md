@@ -12,7 +12,7 @@ is deliberately excluded from the master permission.
 
 | Permission | Default | Purpose |
 | --- | --- | --- |
-| `bookexport.admin` | Operator | Grant every documented non-replacing capability, including export, custom titles, information/help, all list scopes, review decisions, publication history, non-replacing publication, reload, and diagnostics. |
+| `bookexport.admin` | Operator | Grant every documented non-replacing capability, including export, custom titles, information/help, all list scopes, review decisions, publication history, read-only recovery inspection, non-replacing publication, reload, and diagnostics. |
 | `bookexport.export` | Operator | Process a written book or book and quill from the player's main hand. |
 | `bookexport.export.custom-title` | Operator | Supply a book-and-quill title or override a signed book title. |
 | `bookexport.info` | Everyone | Use `/bookexport info`. |
@@ -27,6 +27,7 @@ is deliberately excluded from the master permission.
 | `bookexport.admin.publish` | Operator | Publish verified drafts using `fail` or `unique`, and enter the publication workflow. |
 | `bookexport.admin.replace` | False | Use replacement publication after BookExport creates a backup. This does not grant publication by itself. |
 | `bookexport.admin.history` | Operator | List and inspect retained content-free publication records. |
+| `bookexport.admin.recovery` | Operator | List and inspect content-free crash-journal metadata and checksum reconciliation. It cannot mutate or recover files. |
 | `bookexport.admin.reload` | Operator | Reload and validate the BookExport configuration. |
 | `bookexport.admin.debug` | Operator | View runtime, workflow, CMI, held-book, and no-write preview diagnostics. |
 
@@ -47,6 +48,7 @@ is deliberately excluded from the master permission.
 - `bookexport.admin.approve`
 - `bookexport.admin.publish`
 - `bookexport.admin.history`
+- `bookexport.admin.recovery`
 - `bookexport.admin.reload`
 - `bookexport.admin.debug`
 
@@ -71,6 +73,7 @@ These are capability examples rather than predefined ranks:
 | Approval reviewer | Read-only reviewer nodes plus `bookexport.admin.approve` |
 | Publisher | Staged-list/review nodes as required by policy, plus `bookexport.admin.publish` |
 | Replacement publisher | Publisher permissions plus the separately reviewed `bookexport.admin.replace` |
+| Recovery auditor | `bookexport.admin.status` for aggregate health and `bookexport.admin.recovery` for transaction IDs, actors, filenames, states, and checksums |
 | Non-replacing administrator | `bookexport.admin` |
 
 Authoring and publishing are intentionally separate. Book content may contain CMI
@@ -90,6 +93,11 @@ filenames:
 
 The commands themselves still enforce their action permissions. List access is an
 additional privacy boundary for discovery, not a substitute for an action node.
+
+Recovery-journal metadata has its own privacy boundary. Status-only administrators
+see clear/unresolved/unreadable counts, while `bookexport.admin.recovery` exposes
+the complete transaction UUID, basename-only workflow filenames, publisher identity,
+timestamps, byte counts, checksums, states, and read-only reconciliation result.
 
 ## Legacy Permission Aliases
 

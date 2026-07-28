@@ -22,11 +22,12 @@ class BookExportInfoTest {
         List<Component> messages = info().messages(true, true, true, true);
 
         assertEquals(List.of(
-                "BookExport 2.0.1 build 017",
+                "BookExport 2.0.2 build 019",
                 "About: Turn a held written book or book and quill into a reviewable UTF-8 CMI CustomText draft",
-                "Compatibility: Paper 26.2, Java target 25",
+                "Compatibility: Paper 26.2 stable build 84, Java target 25",
+                "Compile API: 26.2.build.84-stable",
                 "Workflow: staged",
-                "Server: Paper 26.2 build 60",
+                "Server: Paper 26.2 build 84",
                 "Quick start: Use the clickable commands below",
                 "/bookexport help - show the commands available to you",
                 "/bookexport stage [title] - hold a book, then create a draft for staff review",
@@ -35,11 +36,11 @@ class BookExportInfoTest {
                 "Source: " + SOURCE_URL
         ), messages.stream().map(BookExportInfoTest::plainText).toList());
 
-        assertClick(messages.get(6), ClickEvent.Action.SUGGEST_COMMAND, "/bookexport help");
-        assertClick(messages.get(7), ClickEvent.Action.SUGGEST_COMMAND, "/bookexport stage [title]");
-        assertClick(messages.get(8), ClickEvent.Action.SUGGEST_COMMAND, "/bookexport list staged");
-        assertChildClick(messages.get(9), ClickEvent.Action.OPEN_URL, DOCS_URL);
-        assertChildClick(messages.get(10), ClickEvent.Action.OPEN_URL, SOURCE_URL);
+        assertClick(messages.get(7), ClickEvent.Action.SUGGEST_COMMAND, "/bookexport help");
+        assertClick(messages.get(8), ClickEvent.Action.SUGGEST_COMMAND, "/bookexport stage [title]");
+        assertClick(messages.get(9), ClickEvent.Action.SUGGEST_COMMAND, "/bookexport list staged");
+        assertChildClick(messages.get(10), ClickEvent.Action.OPEN_URL, DOCS_URL);
+        assertChildClick(messages.get(11), ClickEvent.Action.OPEN_URL, SOURCE_URL);
     }
 
     @Test
@@ -48,16 +49,17 @@ class BookExportInfoTest {
         List<String> text = messages.stream().map(BookExportInfoTest::plainText).toList();
 
         assertEquals(List.of(
-                "BookExport 2.0.1 build 017",
+                "BookExport 2.0.2 build 019",
                 "About: Turn a held written book or book and quill into a reviewable UTF-8 CMI CustomText draft",
-                "Compatibility: Paper 26.2, Java target 25",
+                "Compatibility: Paper 26.2 stable build 84, Java target 25",
+                "Compile API: 26.2.build.84-stable",
                 "Workflow: staged",
-                "Server: Paper 26.2 build 60",
+                "Server: Paper 26.2 build 84",
                 "Documentation: " + DOCS_URL,
                 "Source: " + SOURCE_URL
         ), text);
-        assertChildClick(messages.get(5), ClickEvent.Action.OPEN_URL, DOCS_URL);
-        assertChildClick(messages.get(6), ClickEvent.Action.OPEN_URL, SOURCE_URL);
+        assertChildClick(messages.get(6), ClickEvent.Action.OPEN_URL, DOCS_URL);
+        assertChildClick(messages.get(7), ClickEvent.Action.OPEN_URL, SOURCE_URL);
     }
 
     @Test
@@ -65,28 +67,31 @@ class BookExportInfoTest {
         List<Component> messages = info().messages(true, true, true, false);
         List<String> text = messages.stream().map(BookExportInfoTest::plainText).toList();
 
-        assertEquals(10, messages.size());
-        assertEquals("Quick start: Use the clickable commands below", text.get(5));
-        assertEquals("/bookexport help - show the commands available to you", text.get(6));
+        assertEquals(11, messages.size());
+        assertEquals("Quick start: Use the clickable commands below", text.get(6));
+        assertEquals("/bookexport help - show the commands available to you", text.get(7));
         assertEquals(
                 "/bookexport stage [title] - hold a book, then create a draft for staff review",
-                text.get(7)
+                text.get(8)
         );
         assertFalse(text.stream().anyMatch(line -> line.startsWith("/bookexport list staged")));
-        assertClick(messages.get(6), ClickEvent.Action.SUGGEST_COMMAND, "/bookexport help");
-        assertClick(messages.get(7), ClickEvent.Action.SUGGEST_COMMAND, "/bookexport stage [title]");
-        assertChildClick(messages.get(8), ClickEvent.Action.OPEN_URL, DOCS_URL);
-        assertChildClick(messages.get(9), ClickEvent.Action.OPEN_URL, SOURCE_URL);
+        assertClick(messages.get(7), ClickEvent.Action.SUGGEST_COMMAND, "/bookexport help");
+        assertClick(messages.get(8), ClickEvent.Action.SUGGEST_COMMAND, "/bookexport stage [title]");
+        assertChildClick(messages.get(9), ClickEvent.Action.OPEN_URL, DOCS_URL);
+        assertChildClick(messages.get(10), ClickEvent.Action.OPEN_URL, SOURCE_URL);
     }
 
     private static BookExportInfo info() {
         return new BookExportInfo(
-                "2.0.1",
-                "017",
+                "2.0.2",
+                "019",
                 "26.2",
+                "26.2.build.84-stable",
+                "84",
+                "STABLE",
                 "25",
                 "staged",
-                "Paper 26.2 build 60",
+                "Paper 26.2 build 84",
                 DOCS_URL,
                 SOURCE_URL
         );

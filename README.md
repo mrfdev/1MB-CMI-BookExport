@@ -4,7 +4,7 @@ BookExport is a Paper 26.2 administration plugin that turns a written book or bo
 
 Fresh installations use a review-first workflow: an author stages a draft, a trusted administrator reviews it, and an administrator publishes it into CMI's CustomText directory. Existing version 2 configurations continue in direct compatibility mode until an administrator deliberately migrates them.
 
-The 2.0.1 build modernizes the original 1.21 plugin with Java 25 bytecode, Paper 26.2 APIs, Adventure messages, Gradle, correct CMI pagination, granular permissions, validated workflow directories, collision-safe publication, content-free draft manifests, diagnostics, and regression tests.
+The 2.0.2 release modernizes the original 1.21 plugin with Java 25 bytecode, stable Paper 26.2 APIs, Adventure messages, Gradle, correct CMI pagination, granular permissions, validated workflow directories, collision-safe publication, content-free draft manifests, a durable publication journal with read-only recovery inspection, diagnostics, and regression tests.
 
 Canonical player documentation: [docs.1moreblock.com/custom-server-plugins/bookexport/](https://docs.1moreblock.com/custom-server-plugins/bookexport/)
 
@@ -13,11 +13,12 @@ Canonical player documentation: [docs.1moreblock.com/custom-server-plugins/booke
 | Component | Supported target |
 | --- | --- |
 | Server | Paper 26.2 only |
-| Compile API | `io.papermc.paper:paper-api:26.2.build.60-beta` |
+| Compile API | `io.papermc.paper:paper-api:26.2.build.84-stable` |
+| Server release | Paper 26.2 STABLE build 84 (`Paper-26.2.jar`) |
 | Java bytecode | Java 25 |
-| Tested runtimes | Oracle Java 25.0.2 and 26.0.1 |
+| Tested runtimes | Oracle Java 25.0.4 and 26.0.2 |
 | Build tool | Gradle 9.4.1 wrapper |
-| BookExport | `2.0.1` (repository build `017`) |
+| BookExport | `2.0.2` (release build `019`) |
 
 Older Minecraft, Paper, Spigot, and Java releases are intentionally unsupported.
 
@@ -65,6 +66,8 @@ Typical uses include:
 - Publishes reviewed drafts with `fail`, `unique`, or backed-up `replace` collision behavior.
 - Detects managed drafts changed after staging or approval and blocks unsafe publication until their manifest is reviewed and approved again.
 - Attempts an atomic manifest checkpoint immediately after each committed live publication and before archival; a stored pending record blocks repeat publication, and an archival failure retains the draft.
+- Plans exact live, archive, and optional backup filenames, then stores a durable content-free transaction before any backup or live mutation.
+- Reconciles interrupted transactions by checksum at startup and through read-only recovery list/show commands; it never automatically retries, rolls back, deletes, republishes, finalizes, cleans up, or reloads CMI.
 - Preserves page order and page boundaries without reflowing or truncating valid book content.
 - Produces correct CMI pagination: controlled `<AutoPage>` first line and `<NextPage>` only between pages.
 - Preserves CMI and PlaceholderAPI-looking tokens for CMI to resolve for the eventual viewer.
@@ -82,7 +85,7 @@ Typical uses include:
 
 Paper is the only production/plugin API dependency. JUnit and the Paper-aligned Adventure API are used only by the test suite and are not bundled. BookExport does not call the APIs of CMI, CMILib, PlaceholderAPI, Vault, or LuckPerms.
 
-The current test-server versions, audited on 2026-07-14, are:
+The current test-server versions, reverified on 2026-07-28, are:
 
 | Plugin | Tested version | Relationship to BookExport |
 | --- | --- | --- |
@@ -102,12 +105,12 @@ Do not add these plugins to BookExport's Gradle dependencies unless BookExport l
    ./gradlew clean build
    ```
 
-2. Copy `build/libs/1MB-BookExport-v2.0.1-017-j25-26.2.jar` to the Paper 26.2 server's `plugins/` directory.
+2. Copy `build/libs/1MB-BookExport-v2.0.2-019-j25-26.2.jar` to the Paper 26.2 server's `plugins/` directory.
 3. Remove any older BookExport JAR so Paper does not discover two copies.
 4. Restart Paper cleanly. Do not use Bukkit `/reload` or a hot-reload plugin.
-5. Confirm `/version BookExport` reports `2.0.1`.
-6. Confirm `/bookexport info` reports build `017` and opens the canonical player documentation.
-7. Run `/bookexport admin status` and verify config version 3, workflow `staged`, four writable workflow directories, and collision mode `fail`.
+5. Confirm `/version BookExport` reports `2.0.2`.
+6. Confirm `/bookexport info` or `/bookexport version` reports build `019`, the exact stable API, and opens the canonical player documentation.
+7. Run `/bookexport admin status` and verify config version 3, workflow `staged`, five writable workflow/transaction directories, collision mode `fail`, and a clear recovery journal.
 
 If the server already has a version 2 `config.yml`, BookExport intentionally starts in direct compatibility mode. It does not rewrite the config or move existing files. Follow [Migrating a version 2 configuration](#migrating-a-version-2-configuration) when ready to enable staged-by-default exports.
 
@@ -178,7 +181,9 @@ Only grant export access to trusted authors. Book content is intentionally prese
 | `/bookexport stage [title]` | Always create a staged draft, regardless of workflow mode | `bookexport.export`; a custom title also needs `bookexport.export.custom-title` |
 | `/bookexport <title>` | Legacy shorthand for a custom-title normal-workflow export | `bookexport.export` and `bookexport.export.custom-title` |
 | `/bookexport info` | Introduce BookExport, show installed version/build and compatibility, suggest starting commands, and open the canonical docs or source | `bookexport.info` |
+| `/bookexport version` | Exact alias for `/bookexport info`; it never becomes a legacy export title | `bookexport.info` |
 | `/bookexport help` or `/bookexport ?` | Show only commands the sender may use | `bookexport.help` |
+| `/bookexport status` | Exact shortcut for the generated-metadata-backed admin status | `bookexport.admin.status` |
 | `/bookexport admin [status]` | Show validated workflow settings and directory health | `bookexport.admin.status` |
 | `/bookexport admin list [page]` | List published `.txt` files; published is the backward-compatible default scope | `bookexport.admin.list` |
 | `/bookexport admin list <published\|staged\|archive\|backups> [page]` | List files in an explicit workflow scope | Matching `bookexport.admin.list...` permission |
@@ -187,6 +192,8 @@ Only grant export access to trusted authors. Book content is intentionally prese
 | `/bookexport admin changes <staged-file>` | Mark a managed draft changes-requested and revoke its approval | `bookexport.admin.approve` |
 | `/bookexport admin history [page]` | List pending/finalized publication records newest first | `bookexport.admin.history` |
 | `/bookexport admin history show <manifest-id>` | Show one retained publication record by its stable UUID | `bookexport.admin.history` |
+| `/bookexport admin recovery` or `/bookexport admin recovery list [page]` | List interrupted or residual publication journals newest first without changing files | `bookexport.admin.recovery` |
+| `/bookexport admin recovery show <transaction-id>` | Checksum-reconcile one complete transaction UUID without changing files | `bookexport.admin.recovery` |
 | `/bookexport admin publish <staged-file> [fail\|unique\|replace]` | Publish a staged draft; omitted mode uses `publish-collision-mode` | `bookexport.admin.publish`; `replace` also needs `bookexport.admin.replace` |
 | `/bookexport admin reload` | Reload and validate `config.yml` | `bookexport.admin.reload` |
 | `/bookexport admin debug [runtime\|book\|cmi\|workflow\|preview [title]]` | Use the complete read-only debug family through the admin route | `bookexport.admin.debug`; a custom preview title also needs `bookexport.export.custom-title` |
@@ -199,7 +206,7 @@ Only grant export access to trusted authors. Book content is intentionally prese
 | `/bookexport debug workflow` | Show config compatibility mode, workflow directories, counts, and collision mode | `bookexport.admin.debug` |
 | `/bookexport debug preview [title]` | Preview destination scope, sanitized filename candidate, pages, UTF-16 units, and bytes without writing | `bookexport.admin.debug`; a custom title also needs `bookexport.export.custom-title` |
 
-All information, administration, review, history, list, publish, and debug commands work from the console except held-book inspection, preview, and export/stage.
+All information, administration, review, history, recovery, list, publish, and debug commands work from the console except held-book inspection, preview, and export/stage.
 
 When multiple list pages exist, player Previous/Next controls run the adjacent list command and preserve the selected scope. A filename can be clicked to copy it. Staged rows identify unreviewed, approved, changes-requested, changed, already-published, association-mismatch, missing, corrupt, or legacy state and expose only actions the sender may use. Review is read-only; Approve, Changes, and Publish controls suggest commands for deliberate submission. Publish continues to suggest `/bookexport admin publish <file> fail`, never executes immediately, and never inherits a configured replacement policy. Console output remains readable, and console publishers type the explicit command manually.
 
@@ -220,6 +227,8 @@ When multiple list pages exist, player Previous/Next controls run the adjacent l
 
 # Inspect runtime and workflow health
 /bookexport info
+/bookexport version
+/bookexport status
 /bookexport admin status
 /bookexport debug runtime
 /bookexport debug cmi
@@ -244,6 +253,10 @@ When multiple list pages exist, player Previous/Next controls run the adjacent l
 /bookexport admin history 2
 /bookexport admin history show 123e4567-e89b-12d3-a456-426614174000
 
+# Inspect interrupted publication metadata without changing any file
+/bookexport admin recovery list
+/bookexport admin recovery show 323e4567-e89b-12d3-a456-426614174000
+
 # Publish only when no case-insensitive target exists
 /bookexport admin publish july_news.txt fail
 
@@ -261,7 +274,7 @@ When multiple list pages exist, player Previous/Next controls run the adjacent l
 
 | Permission | Default | Purpose |
 | --- | --- | --- |
-| `bookexport.admin` | OP | Grants every documented non-replacing capability, including staging, review decisions, history, scoped lists, and publication; deliberately excludes replacement |
+| `bookexport.admin` | OP | Grants every documented non-replacing capability, including staging, review decisions, history, read-only recovery, scoped lists, and publication; deliberately excludes replacement |
 | `bookexport.export` | OP | Process the held book through the configured workflow or explicit `stage` route |
 | `bookexport.export.custom-title` | OP | Override the signed title or name a writable-book export |
 | `bookexport.info` | Everyone | View public plugin and compatibility information |
@@ -274,6 +287,7 @@ When multiple list pages exist, player Previous/Next controls run the adjacent l
 | `bookexport.admin.review` | OP | View manifest metadata, review state, and current checksum integrity |
 | `bookexport.admin.approve` | OP | Approve the current draft bytes or mark a draft changes-requested |
 | `bookexport.admin.history` | OP | List and inspect retained publication records |
+| `bookexport.admin.recovery` | OP | List and inspect content-free journal state and checksum observations; cannot mutate files |
 | `bookexport.admin.publish` | OP | Publish staged drafts with `fail` or `unique`, and enter the publish workflow |
 | `bookexport.admin.replace` | False | Use the backed-up `replace` collision mode; independent and not inherited by `bookexport.admin` |
 | `bookexport.admin.reload` | OP | Reload configuration |
@@ -313,7 +327,7 @@ Fresh config version 3 files default to `staged`. Existing version 2 files load 
 
 `/bookexport list [page]` and `/bookexport admin list [page]` continue to mean the published scope for backward compatibility.
 
-Manifest sidecars are workflow metadata rather than a fifth `.txt` scope. They are excluded from normal file lists and are never copied into CMI's CustomText directory.
+Manifest sidecars and transaction journals are workflow metadata rather than additional `.txt` scopes. They are excluded from normal file lists and are never copied into CMI's CustomText directory.
 
 ### Draft manifests and review state
 
@@ -359,9 +373,25 @@ The optional command mode overrides the configured `publish-collision-mode` for 
 | `unique` | Publish as `_1`, `_2`, and so on | Publish with the staged filename |
 | `replace` / `replace-with-backup` | Copy the current published file to `backup-directory`, then atomically replace it | Stop and retain the staged draft; use `fail` or `unique` for a new file |
 
-Publication copies the complete staged content to a temporary file in the published directory before the final move. It rejects traversal, ambiguous case-insensitive matches, non-regular files, and symbolic-link staged candidates.
+Publication first selects exact live, UUID-bearing archive, and optional UUID-bearing backup filenames. It stores that plan atomically as `plugins/BookExport/transactions/<transaction-uuid>.bookexport-transaction.properties` before any backup or live mutation. The journal contains only IDs, revisions/states, timestamps, publisher identity, collision mode, basename-only filenames, byte counts, SHA-256 values, and a checksum of the workflow roots—never book pages or rendered CustomText.
 
-Immediately after the verified live move, BookExport atomically writes a `published-archive-pending` manifest checkpoint before it archives or deletes staged content. It then creates a timestamped archive, removes the staged `.txt`, and finalizes the history sidecar with the final filename, checksum, publisher, collision mode, backup, archive, and outcome. The manifest sidecar never enters CMI. If checkpoint storage itself fails after the live move, the live publication has still succeeded, the staged draft is kept, archival is skipped, and the operator is warned not to retry. If archiving or finalization fails after a checkpoint, publication remains successful, the checkpoint blocks accidental republishing, a warning is reported, and the retained pending record remains available in history. A failed pre-publication operation never consumes the staged draft. This checkpoint is an audit safeguard, not the cross-process lock or full crash-recovery journal listed in the backlog.
+The durable protocol advances through these states:
+
+| State | Durable fact |
+| --- | --- |
+| `prepared` | The exact content-free plan exists; no backup or live mutation was authorized before this record. |
+| `backup-created` | A replacement backup containing the exact old live bytes exists. Replacement only. |
+| `live-committed` | The reviewed bytes were committed at the planned live filename. |
+| `manifest-checkpointed` | The active manifest records `published-archive-pending`. |
+| `archive-created` | The exact reviewed bytes exist at the planned archive filename. |
+| `staged-removed` | The staged `.txt` source was removed after live/archive verification. |
+| `finalized` | Final archive manifest history is durable; normal completion then deletes the temporary journal. |
+
+Every file mutation is followed by its journal update. File contents and directory entries are forced to durable storage; state updates use compare-and-swap revisions. If a process, host, or I/O failure lands between those boundaries, the journal remains. Startup and `/bookexport admin recovery list|show` only compare the current staged, live, archive, backup, and manifest facts with recorded checksums. Readable unresolved records block the matching draft, staged name, or planned live name; unreadable records block publication globally because their scope cannot be trusted. A completed residual journal is reported informationally.
+
+The scanner reports one of nine explicit assessments: `abandoned-before-live-commit`, `backup-created-no-live-commit`, `live-commit-needs-checkpoint`, `checkpoint-needs-archive`, `archive-needs-source-cleanup`, `archive-needs-manifest-finalize`, `completed-journal-remains`, `conflict-requires-manual-review`, or `unreadable-requires-manual-review`. Detail output also reports whether each named artifact is missing, matches the reviewed checksum, matches the pre-replacement checksum, mismatches, is ambiguous, is unreadable, or is not applicable.
+
+Recovery inspection is intentionally passive and idempotent. BookExport never automatically replays, repairs, retries, republishes, rolls back, restores, deletes, completes archival, promotes a manifest, cleans a journal, or reloads CMI. Preserve the files and use the [troubleshooting procedure](docs/troubleshooting.md#manual-reconciliation-procedure) for manual review. This journal protects reviewed staged `/bookexport admin publish`; direct compatibility-mode exports do not create manifests, archives, backups, or transaction journals. The remaining cross-process locking limitation is tracked separately in the backlog.
 
 BookExport deliberately does not execute `/cmi reload`; an administrator remains responsible for reviewing the published file and refreshing CMI.
 
@@ -455,7 +485,7 @@ BookExport therefore:
 | `list-page-size` | `10` | Filenames shown per list page, clamped to 1-50 |
 | `debug-logging` | `false` | Add content-free stage/direct-export statistics; review and publication audit metadata is logged independently |
 
-Build 017 keeps `config-version: 3` and adds no manifest or approval configuration keys. Managed sidecars are automatic for staged drafts, and explicit approval remains recommended rather than globally required so unchanged `unreviewed` and legacy drafts keep their compatible publication behavior.
+Build 019 keeps `config-version: 3` and adds no journal, manifest, or approval configuration keys. Managed sidecars and the fixed internal transaction directory are automatic, and explicit approval remains recommended rather than globally required so unchanged `unreviewed` and legacy drafts keep their compatible publication behavior.
 
 ### Path resolution and validation
 
@@ -463,11 +493,11 @@ Build 017 keeps `config-version: 3` and adds no manifest or approval configurati
 - `~/plugins/CMI/CustomText/` starts at the Paper server root.
 - An absolute path is used as configured.
 - A relative path containing `..` may not escape `plugins/BookExport/`.
-- Staging, published, archive, and backup directories must all be writable and resolve to distinct, non-overlapping locations.
+- Staging, published, archive, backup, and the fixed `plugins/BookExport/transactions/` directory must all be writable and resolve to distinct, non-overlapping locations.
 - Workflow directories may not be symbolic links. Staged publication candidates must be direct, regular, non-symbolic-link `.txt` files.
 - A managed manifest is a direct sibling of its staged `.txt`; BookExport does not follow a manifest symbolic link or accept a sidecar associated with another path.
 - Manifest and creation-marker associations are resolved case-insensitively, and ambiguous case variants fail closed on case-sensitive filesystems.
-- Startup fails safely when a configured workflow directory cannot be created, validated, or written.
+- Startup fails safely when a workflow or transaction directory cannot be created, validated, or written. If transaction storage later becomes missing or unreadable, reviewed publication blocks rather than falling back to an unjournaled write.
 - A rejected reload leaves the previous validated runtime settings active.
 
 ### Migrating a version 2 configuration
@@ -484,10 +514,10 @@ To opt in to config version 3:
 
 1. Back up `plugins/BookExport/config.yml` and any existing BookExport/CMI text files.
 2. Add `workflow-mode`, the three workflow directory keys, and `publish-collision-mode` using the packaged config as a reference.
-3. Confirm the staging, published, archive, and backup paths are distinct and do not contain one another.
+3. Confirm the staging, published, archive, backup, and fixed transaction paths are distinct and do not contain one another.
 4. Set `config-version: 3` last.
 5. Restart Paper, or run `/bookexport admin reload` if only valid BookExport settings changed.
-6. Confirm `/bookexport admin status` and `/bookexport debug workflow` show staged mode and four writable directories.
+6. Confirm `/bookexport admin status` and `/bookexport debug workflow` show staged mode, five writable directories, and a clear recovery journal.
 7. Stage and publish a disposable test book before migrating production authoring.
 
 A config version newer than this build supports is rejected instead of being guessed at.
@@ -522,8 +552,9 @@ Hex input is validated before conversion. Malformed sequences are treated as tex
 - `servers/`, build output, caches, logs, IDE files, and local OS metadata are excluded by `.gitignore`.
 - Debug output reports sizes and selected validated settings, never page text, server secrets, or the full configuration file.
 - Manifests and server-log audit records contain metadata and SHA-256 values, never book pages or the rendered CustomText body.
+- Transaction journals and recovery objects/output are also content-free. They use basename-only workflow filenames and never store or display absolute paths through the recovery permission.
 - Manifest metadata includes player names, UUIDs, the signed book author, filenames, and timestamps. Treat sidecars as private staff records even though they contain no page content.
-- Admin status, review/history output, and scoped lists can expose filesystem paths, private draft filenames, or author metadata and are OP-only by default.
+- Admin status, review/history/recovery output, and scoped lists can expose filesystem paths, private filenames, actors, timestamps, or checksums and are OP-only by default. Ordinary status shows only aggregate recovery health; detailed transaction metadata requires `bookexport.admin.recovery`.
 - Staged-filename tab completion requires the relevant review, approval, or publication permission together with staged-list permission, so action-only users cannot enumerate private draft names.
 - Book metadata can include player name, author, export time, and size statistics when configured. Filename templates can separately include the player's UUID.
 - Staging creates a review boundary; it does not make author content safe. CMI actions, placeholders, or reserved directives can become active after publication.
@@ -533,6 +564,7 @@ Hex input is validated before conversion. Malformed sequences are treated as tex
 - Invalid active sidecars cannot suppress unrelated valid history records; they remain blocked from every direct or mutating draft operation and are counted by status health.
 - Replacement requires an independent permission, always creates a backup, and is excluded from both master nodes.
 - Publication rejects path traversal, symlink candidates, ambiguous case-insensitive matches, and non-regular files.
+- Recovery list/show and startup scanning are read-only and never provide a mutating click action or invoke CMI.
 
 ## Building and testing
 
@@ -545,10 +577,11 @@ Run the complete verification suite:
 The build:
 
 - uses the installed Java 25 toolchain;
-- targets Paper API 26.2 beta build 60;
+- targets Paper API `26.2.build.84-stable`;
 - treats all Java compiler warnings as errors;
 - runs JUnit 6.1.0 regression tests;
-- creates plugin, source, and Javadoc JARs under `build/libs/`.
+- creates and verifies plugin, source, and Javadoc JARs under `build/libs/`;
+- rejects stale BookExport versions/builds, Java targets, Paper targets/APIs/builds/channels/JARs, artifact examples, and JDK patch versions across every maintained documentation page.
 
 The main artifact uses this naming scheme:
 
@@ -556,22 +589,24 @@ The main artifact uses this naming scheme:
 1MB-BookExport-v<version>-<build>-j<java>-<minecraft>.jar
 ```
 
-For this release, build `017` is the zero-padded repository commit ordinal: sixteen commits existed before the standalone-documentation and `/info` release commit.
+Build `019` is the next monotonic BookExport release build. Release build numbers are intentionally independent of Git commit counts so an uncommitted release candidate does not need an artificial commit sequence.
 
-### Build 017 verification snapshot
+### Build 019 verification snapshot
 
-The release candidate was verified on 2026-07-14 before publication:
+The release candidate was verified on 2026-07-28 before publication:
 
-- `./gradlew clean build --warning-mode all` completed successfully with 165 tests: 163 passed, zero failed, zero errored, and two case-variant tests were skipped because the test Mac uses case-insensitive APFS.
-- The main plugin class is Java class-file major version 69, and the packaged descriptor declares BookExport 2.0.1 with Paper API 26.2.
-- Paper 26.2 beta build 60 started cleanly on Oracle Java 25.0.2 with CMI 9.8.8.5, CMILib 1.5.9.9, LuckPerms 5.5.59, and PlaceholderAPI 2.12.3.
-- Build 017 live checks covered clean enable/disable, `/bookexport info`, permission-filtered help, and runtime diagnostics; BookExport emitted no warning, error, exception, or deprecated-API message.
-- The automated suite covers explicit approval, changes requested, changed-byte rejection, reapproval, legacy implicit approval, publication history, incomplete creation markers, malformed sidecars, and isolation of valid history from an unrelated corrupt draft. Earlier disposable Paper/CMI integration testing also confirmed that fixture text stayed out of BookExport logs and manifest sidecars, manifests stayed out of CMI's CustomText directory, and cleanup completed.
+- `./gradlew clean build --warning-mode all` completed on JDK 25.0.4 with 253 tests: 251 passed, zero failures/errors, and two expected case-variant skips on case-insensitive APFS. It uses `--release 25`, treats compiler warnings as errors, and verifies generated resources, the JAR manifest, Java class version, all three release JARs, artifact names, and release metadata across every maintained documentation page.
+- The main plugin class is Java class-file major version 69, and the packaged descriptor declares BookExport 2.0.2 with `api-version: 26.2`.
+- Paper 26.2 STABLE build 84 is installed as `Paper-26.2.jar`; PaperScript verifies its saved and installed SHA-256 as `defe82c1c89067186895de34cf32983e9f5a2ea387cfe7597c020faebb98ca16`.
+- Build 019 is smoke-tested through clean startup, metadata/status/recovery commands, and shutdown on Oracle Java 25.0.4 and 26.0.2 with CMI 9.8.8.5, CMILib 1.5.9.9, LuckPerms 5.5.59, and PlaceholderAPI 2.12.3.
+- Neither smoke test emitted a BookExport warning, error, exception, or deprecated-API message. JVM startup did report Paper-bundled JOML's terminally deprecated `sun.misc.Unsafe::objectFieldOffset` use on both runtimes; Java 26 additionally reported LuckPerms-bundled Commodore final-field mutation. These third-party warnings did not originate in BookExport.
+- `/bookexport version` is an exact information alias and `/bookexport status` is an exact admin-status alias; neither can fall through to the legacy custom-title export route.
+- The automated suite adds 44 reachable collision-mode/crash-boundary scenarios, three complete publication modes, strict transaction codec/store durability, checksum reconciliation, restart-idempotent zero-write scans, scoped/global blocking, malformed-journal handling, direct-mode isolation, and sentinel privacy. Earlier manifest, renderer, filename, command, and Paper/CMI integration coverage remains in place.
 
 Final artifact SHA-256:
 
 ```text
-0c409122ca6da39854acf10cefd377687cc46cd75689c16efa04cb499300f88f  1MB-BookExport-v2.0.1-017-j25-26.2.jar
+b2c55799ba63e7c7885eb568ff38e0a4d375f697857cb16fdd1e5ec3a26825f5  1MB-BookExport-v2.0.2-019-j25-26.2.jar
 ```
 
 This automated and console verification does not replace the repository's in-game beta review.
@@ -634,7 +669,11 @@ This is intentional. Grant `bookexport.admin.replace` separately. Replacement al
 
 ### Publication succeeded with an archive warning
 
-The published file is already live. Review the warning and the staged/archive directories. BookExport retains the staged draft when it cannot safely complete archiving.
+The published file is already live. Do not retry. Run `/bookexport admin recovery list`, inspect the matching complete UUID with `recovery show`, preserve the staged/live/archive/backup/manifests/journal set, and follow the checksum-based manual reconciliation procedure. BookExport performs no automatic repair or CMI reload.
+
+### Startup reports unresolved or unreadable recovery journals
+
+Startup reports only aggregate counts. Use `/bookexport admin recovery list` with the dedicated recovery permission, then `show <complete-transaction-uuid>` for content-free state, filenames, counts, checksums, and artifact observations. A readable record blocks its affected draft/staged/live names; an unreadable record blocks all reviewed publication because its scope cannot be trusted. Repeated startup/status/list/show scans are read-only and do not advance or clean a journal.
 
 ### A filename gained `_1`
 
@@ -650,7 +689,7 @@ The generated separator is correct. Check whether the original book itself conta
 
 ### Reload was rejected
 
-Read the server log and correct the invalid path or value. Confirm all four workflow directories are distinct and non-overlapping. The previous validated runtime settings remain active.
+Read the server log and correct the invalid path or value. Confirm all four configurable workflow directories and the fixed transaction directory are distinct and non-overlapping. The previous validated runtime settings remain active.
 
 ## Source and license
 

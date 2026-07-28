@@ -11,6 +11,9 @@ record BookExportInfo(
         String version,
         String buildNumber,
         String paperTarget,
+        String paperApiVersion,
+        String paperBuild,
+        String paperChannel,
         String javaTarget,
         String workflow,
         String serverVersion,
@@ -21,6 +24,9 @@ record BookExportInfo(
         Objects.requireNonNull(version, "version");
         Objects.requireNonNull(buildNumber, "buildNumber");
         Objects.requireNonNull(paperTarget, "paperTarget");
+        Objects.requireNonNull(paperApiVersion, "paperApiVersion");
+        Objects.requireNonNull(paperBuild, "paperBuild");
+        Objects.requireNonNull(paperChannel, "paperChannel");
         Objects.requireNonNull(javaTarget, "javaTarget");
         Objects.requireNonNull(workflow, "workflow");
         Objects.requireNonNull(serverVersion, "serverVersion");
@@ -42,8 +48,10 @@ record BookExportInfo(
         ));
         messages.add(Messages.info(
                 "Compatibility",
-                "Paper " + paperTarget + ", Java target " + javaTarget
+                "Paper " + paperTarget + ' ' + paperChannel.toLowerCase(java.util.Locale.ROOT)
+                        + " build " + paperBuild + ", Java target " + javaTarget
         ));
+        messages.add(Messages.info("Compile API", paperApiVersion));
         messages.add(Messages.info("Workflow", workflow));
         messages.add(Messages.info("Server", serverVersion));
         if (canHelp || canExport || canListStaged) {

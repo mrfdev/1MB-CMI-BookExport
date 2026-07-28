@@ -1,17 +1,18 @@
 # Installing and Updating BookExport
 
-BookExport 2.0.1 build 017 targets Paper 26.2 and Java 25 bytecode. Older Paper,
+BookExport 2.0.2 build 019 targets Paper 26.2 and Java 25 bytecode. Older Paper,
 Minecraft, and Spigot releases, plus Java runtimes below 25, are intentionally
 unsupported.
 
 ## Requirements
 
-- A Paper 26.2 server. The plugin compiles against Paper API
-  `26.2.build.60-beta` and declares `api-version: 26.2`.
+- A Paper 26.2 server on the stable channel. The plugin compiles against Paper API
+  `26.2.build.84-stable` and declares `api-version: 26.2`.
 - A Java 25 or newer runtime for Paper and a Java 25 JDK/toolchain when building
-  from source.
-- Filesystem write access for the BookExport data directory and all four configured
-  workflow directories.
+  from source. Release verification builds with Oracle JDK 25.0.4 and also starts
+  the server with Oracle JDK 26.0.2 without changing the Java 25 bytecode target.
+- Filesystem write access for the BookExport data directory, its fixed transaction
+  journal, and all four configured workflow directories.
 
 Paper is the only required runtime plugin/API. CMI is optional to BookExport itself,
 but it is needed when the published `.txt` files are intended to be displayed as
@@ -27,15 +28,16 @@ From a clean checkout of
 ./gradlew clean build --warning-mode all
 ```
 
-The Gradle 9.4.1 wrapper selects a Java 25 toolchain, compiles against Paper 26.2
-beta build 60, treats Java compiler warnings as errors, runs the JUnit suite, and
-builds the plugin, source, and Javadoc JARs under `build/libs/`. The wrapper and
-dependencies may require network access on their first use.
+The Gradle 9.4.1 wrapper selects a Java 25 toolchain, compiles against stable Paper
+API build 84, treats Java compiler warnings as errors, runs the JUnit suite and
+release-drift validation, and builds the plugin, source, and Javadoc JARs under
+`build/libs/`. The wrapper and dependencies may require network access on their
+first use.
 
 Deploy only this main artifact:
 
 ```text
-build/libs/1MB-BookExport-v2.0.1-017-j25-26.2.jar
+build/libs/1MB-BookExport-v2.0.2-019-j25-26.2.jar
 ```
 
 The `-sources.jar` and `-javadoc.jar` artifacts are references for developers and
@@ -44,7 +46,7 @@ must not be installed as Paper plugins. BookExport uses Gradle, not Maven.
 ## Clean installation
 
 1. Stop Paper cleanly.
-2. Copy `1MB-BookExport-v2.0.1-017-j25-26.2.jar` into the server's `plugins/`
+2. Copy `1MB-BookExport-v2.0.2-019-j25-26.2.jar` into the server's `plugins/`
    directory.
 3. Confirm there is no second or older BookExport JAR in `plugins/`. Paper must
    discover exactly one copy.
@@ -64,8 +66,9 @@ than running with partially validated storage.
 1. Stop Paper and prevent external tools from writing to the BookExport workflow
    directories.
 2. Back up the existing BookExport JAR, `plugins/BookExport/config.yml`, staging,
-   archive, backup, and configured published directories as one recovery set.
-3. Remove the old BookExport JAR from `plugins/` and install the build 017 main JAR.
+   archive, backup, transaction, and configured published directories as one
+   recovery set.
+3. Remove the old BookExport JAR from `plugins/` and install the build 019 main JAR.
    Do not install both versions together.
 4. Keep the existing `config.yml`; do not overwrite it blindly with the packaged
    file. Compare settings and migrate deliberately when needed.
@@ -99,15 +102,23 @@ See [Permissions](permissions.md) for every node and default.
 
 Run these after a clean install or update:
 
-1. Confirm the startup log contains an enabled line for BookExport `2.0.1`, build
-   `017`, Java target `25`, Paper target `26.2`, and the intended workflow and paths.
-2. Confirm `/version BookExport` reports version `2.0.1`.
-3. Run `/bookexport info` and confirm it reports build `017`, Paper `26.2`, Java
-   target `25`, and the clickable canonical documentation URL:
+1. Confirm the startup log contains an enabled line for BookExport `2.0.2`, build
+   `019`, artifact `1MB-BookExport-v2.0.2-019-j25-26.2.jar`, Java target `25`,
+   Paper `26.2` stable build `84`, API `26.2.build.84-stable`, and the intended
+   workflow and paths.
+2. Confirm `/version BookExport` reports version `2.0.2`.
+3. Run `/bookexport info` and `/bookexport version`; confirm both report build
+   `019`, Paper `26.2` stable build `84`, exact compile API
+   `26.2.build.84-stable`, Java target `25`, and the clickable canonical
+   documentation URL:
    `https://docs.1moreblock.com/custom-server-plugins/bookexport/`.
-4. Run `/bookexport admin status`. Confirm configuration version `3` on a fresh
+4. Run `/bookexport status` and `/bookexport admin status`. Confirm both show the
+   generated artifact, Java/Paper targets, exact API, configuration version `3` on a fresh
    installation, workflow `staged`, collision default `fail`, and writable,
-   non-overlapping staging, published, archive, and backup directories.
+   non-overlapping staging, published, archive, backup, and fixed transaction
+   directories. `Recovery journal` must report `clear`; otherwise stop publication
+   and inspect `/bookexport admin recovery list` before granting author or publisher
+   access.
 5. Run `/bookexport debug runtime`, `/bookexport debug workflow`, and
    `/bookexport debug cmi`. Confirm the expected live Java/Paper build, no recorded
    failure, expected integration presence, renderer profile, header, and page marker.

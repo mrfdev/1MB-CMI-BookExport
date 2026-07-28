@@ -19,6 +19,7 @@ record ExportSettings(
         Path publishedDirectory,
         Path archiveDirectory,
         Path backupDirectory,
+        Path transactionDirectory,
         PublishCollisionMode publishCollisionMode,
         String filenameFormat,
         boolean lowercaseFilenames,
@@ -90,11 +91,17 @@ record ExportSettings(
                 resolveDirectory(plugin, config.getString("backup-directory"), "backups"),
                 "Backup"
         );
+        Path dataDirectory = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
+        Path transactionDirectory = validateDirectory(
+                new DirectoryResolution(dataDirectory.resolve("transactions"), dataDirectory),
+                "Transaction"
+        );
         validateDistinctWorkflowDirectories(List.of(
                 stagingDirectory,
                 publishedDirectory,
                 archiveDirectory,
-                backupDirectory
+                backupDirectory,
+                transactionDirectory
         ));
 
         String filenameFormat = valueOrDefault(config.getString("filename-format"), "%title%");
@@ -138,6 +145,7 @@ record ExportSettings(
                 publishedDirectory,
                 archiveDirectory,
                 backupDirectory,
+                transactionDirectory,
                 publishCollisionMode,
                 filenameFormat,
                 config.getBoolean("lowercase-filenames", true),
@@ -233,6 +241,9 @@ record ExportSettings(
     }
 
     private static void rejectSymbolicLinkComponents(Path root, Path directory, String label) throws IOException {
+        if (Files.isSymbolicLink(root)) {
+            throw new IOException(label + " containment root may not be a symbolic link: " + root);
+        }
         Path current = root;
         for (Path component : root.relativize(directory)) {
             current = current.resolve(component);

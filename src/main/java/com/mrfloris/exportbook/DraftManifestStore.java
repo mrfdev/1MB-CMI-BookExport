@@ -450,6 +450,29 @@ final class DraftManifestStore {
             PublishCollisionMode collisionMode,
             DraftManifest.Actor publisher
     ) throws IOException {
+        return finalizePublication(
+                stagedPath,
+                publishedPath,
+                archivedPath,
+                backupPath,
+                backupFingerprint,
+                collisionMode,
+                publisher,
+                PublicationFaultInjector.none()
+        );
+    }
+
+    synchronized DraftManifest finalizePublication(
+            Path stagedPath,
+            Path publishedPath,
+            Path archivedPath,
+            Path backupPath,
+            ContentFingerprint backupFingerprint,
+            PublishCollisionMode collisionMode,
+            DraftManifest.Actor publisher,
+            PublicationFaultInjector faultInjector
+    ) throws IOException {
+        Objects.requireNonNull(faultInjector, "faultInjector");
         Path draft = normalized(stagedPath);
         Path expectedActiveSidecar = sidecarPath(draft);
         Optional<Path> resolvedActiveSidecar = findUniqueCaseInsensitiveMatch(expectedActiveSidecar);
@@ -498,7 +521,9 @@ final class DraftManifestStore {
                     collisionMode
             );
             requireSameFinalManifest(expected, existing);
+            faultInjector.check(PublicationBoundary.HISTORY_MANIFEST_CREATED);
             deleteActiveSidecar(activeSidecar);
+            faultInjector.check(PublicationBoundary.ACTIVE_MANIFEST_REMOVED);
             return existing;
         }
 
@@ -533,7 +558,9 @@ final class DraftManifestStore {
                 completePublication
         );
         createAtomically(historySidecar, finalized);
+        faultInjector.check(PublicationBoundary.HISTORY_MANIFEST_CREATED);
         deleteActiveSidecar(activeSidecar);
+        faultInjector.check(PublicationBoundary.ACTIVE_MANIFEST_REMOVED);
         return finalized;
     }
 
@@ -866,6 +893,7 @@ final class DraftManifestStore {
     private static void deleteActiveSidecar(Path activeSidecar) throws IOException {
         try {
             Files.delete(activeSidecar);
+            forceDirectory(activeSidecar.getParent());
         } catch (IOException exception) {
             throw new IOException("Publication history was finalized, but its active sidecar remains.", exception);
         }
@@ -1226,6 +1254,7 @@ final class DraftManifestStore {
                             StandardCopyOption.ATOMIC_MOVE,
                             StandardCopyOption.REPLACE_EXISTING
                     );
+                    forceDirectory(parent);
                 } else {
                     reservation = createReservation(target);
                     reservationActive = true;
@@ -1238,6 +1267,7 @@ final class DraftManifestStore {
                             StandardCopyOption.ATOMIC_MOVE,
                             StandardCopyOption.REPLACE_EXISTING
                     );
+                    forceDirectory(parent);
                     reservationActive = false;
                 }
             } catch (AtomicMoveNotSupportedException exception) {
@@ -1350,6 +1380,14 @@ final class DraftManifestStore {
         }
     }
 
+    private static void forceDirectory(Path directory) throws IOException {
+        try (FileChannel channel = FileChannel.open(directory, StandardOpenOption.READ)) {
+            channel.force(true);
+        } catch (IOException | UnsupportedOperationException exception) {
+            throw new IOException("Unable to make the manifest directory update durable.", exception);
+        }
+    }
+
     private static void requireRegularFile(Path path, String label) throws IOException {
         if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
             throw new IOException(label + " is not a regular non-symbolic-link file: "
@@ -1430,6 +1468,7 @@ final class DraftManifestStore {
         DraftManifest actual = codec.read(path);
         if (actual.equals(expected)) {
             Files.delete(path);
+            forceDirectory(path.getParent());
         }
     }
 
@@ -1454,6 +1493,7 @@ final class DraftManifestStore {
             throw new IOException("Draft creation marker is not a regular non-symbolic-link file.");
         }
         Files.delete(resolved);
+        forceDirectory(resolved.getParent());
     }
 
     private static boolean isTextFilename(String filename) {

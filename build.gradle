@@ -4,12 +4,18 @@ plugins {
 
 def pluginName = 'BookExport'
 def artifactBaseName = '1MB-BookExport'
-def pluginVersion = '2.0.1'
-// Sixteen commits precede this release; its release commit is repository build 017.
-def buildNumber = '017'
+def pluginVersion = '2.0.2'
+// Monotonic BookExport release build; it is intentionally independent of Git commit count.
+def buildNumber = '019'
 def javaTarget = 25
 def paperTarget = '26.2'
-def paperApiVersion = '26.2.build.60-beta'
+def paperApiVersion = '26.2.build.84-stable'
+def paperBuild = '84'
+def paperChannel = 'STABLE'
+def paperServerJarFileName = "Paper-${paperTarget}.jar"
+def paperServerSha256 = 'defe82c1c89067186895de34cf32983e9f5a2ea387cfe7597c020faebb98ca16'
+def buildJdkVersion = '25.0.4'
+def compatibilityJdkVersion = '26.0.2'
 def adventureVersion = '5.2.0'
 def junitVersion = '6.1.0'
 def docsUrl = 'https://docs.1moreblock.com/custom-server-plugins/bookexport/'
@@ -40,6 +46,7 @@ repositories {
 
 dependencies {
     compileOnly "io.papermc.paper:paper-api:${paperApiVersion}"
+    testImplementation "io.papermc.paper:paper-api:${paperApiVersion}"
     testImplementation "net.kyori:adventure-api:${adventureVersion}"
     testImplementation "org.junit.jupiter:junit-jupiter:${junitVersion}"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher:${junitVersion}"
@@ -59,6 +66,10 @@ tasks.processResources {
             javaTarget     : javaTarget,
             paperTarget    : paperTarget,
             paperApiVersion: paperApiVersion,
+            paperBuild     : paperBuild,
+            paperChannel   : paperChannel,
+            paperServerJarFileName: paperServerJarFileName,
+            paperServerSha256: paperServerSha256,
             docsUrl        : docsUrl,
             sourceUrl      : sourceUrl,
             artifactFileName: artifactFileName
@@ -70,6 +81,10 @@ tasks.processResources {
                 javaTarget     : javaTarget,
                 paperTarget    : paperTarget,
                 paperApiVersion: paperApiVersion,
+                paperBuild     : paperBuild,
+                paperChannel   : paperChannel,
+                paperServerJarFileName: paperServerJarFileName,
+                paperServerSha256: paperServerSha256,
                 docsUrl        : docsUrl,
                 sourceUrl      : sourceUrl,
                 artifactFileName: artifactFileName
@@ -100,13 +115,17 @@ tasks.jar {
                 'Build-Java-Target': javaTarget,
                 'Build-Paper-Target': paperTarget,
                 'Build-Paper-API': paperApiVersion,
+                'Build-Paper-Server-Build': paperBuild,
+                'Build-Paper-Channel': paperChannel,
+                'Build-Paper-Server-Jar': paperServerJarFileName,
+                'Build-Paper-Server-SHA256': paperServerSha256,
                 'Documentation-URL': docsUrl
         )
     }
 }
 
 tasks.register('printBuildConfig') {
-    dependsOn tasks.named('jar')
+    dependsOn tasks.named('jar'), tasks.named('sourcesJar'), tasks.named('javadocJar')
     doLast {
         println 'Build config:'
         println "  jar: ${tasks.named('jar', Jar).get().archiveFile.get().asFile}"
@@ -114,7 +133,342 @@ tasks.register('printBuildConfig') {
         println "  Java target: ${javaTarget}"
         println "  Paper target: ${paperTarget}"
         println "  Paper API: ${paperApiVersion}"
+        println "  Paper release: ${paperTarget} build ${paperBuild} ${paperChannel}"
+        println "  Paper jar: ${paperServerJarFileName}"
+        println "  Build JDK: ${buildJdkVersion}"
+        println "  Compatibility runtime: ${compatibilityJdkVersion}"
     }
+}
+
+def releaseDocumentationFiles = files(
+        'README.md',
+        'checklist-bookexport.md',
+        'feature-improvements-bookexport.md',
+        fileTree('docs') {
+            include '**/*.md'
+            include 'plugin-docs.yml'
+        }
+)
+
+tasks.register('verifyReleaseMetadata') {
+    group = 'verification'
+    description = 'Fails when generated metadata, artifacts, or current release documentation drift.'
+    dependsOn tasks.named('jar'), tasks.named('sourcesJar'), tasks.named('javadocJar')
+    inputs.files(releaseDocumentationFiles)
+    inputs.file('src/main/resources/plugin.yml')
+    inputs.file('src/main/resources/build-info.properties')
+    inputs.properties([
+            version: pluginVersion,
+            buildNumber: buildNumber,
+            artifactFileName: artifactFileName,
+            javaTarget: javaTarget,
+            paperTarget: paperTarget,
+            paperApiVersion: paperApiVersion,
+            paperBuild: paperBuild,
+            paperChannel: paperChannel,
+            paperServerJarFileName: paperServerJarFileName,
+            paperServerSha256: paperServerSha256,
+            buildJdkVersion: buildJdkVersion,
+            compatibilityJdkVersion: compatibilityJdkVersion
+    ])
+
+    doLast {
+        List<String> failures = []
+        File generatedResources = layout.buildDirectory.dir('resources/main').get().asFile
+        File generatedBuildInfo = new File(generatedResources, 'build-info.properties')
+        File generatedPluginDescriptor = new File(generatedResources, 'plugin.yml')
+        File mainJar = tasks.named('jar', Jar).get().archiveFile.get().asFile
+        File sourcesJar = tasks.named('sourcesJar', Jar).get().archiveFile.get().asFile
+        File javadocJar = tasks.named('javadocJar', Jar).get().archiveFile.get().asFile
+
+        Properties buildProperties = new Properties()
+        generatedBuildInfo.withInputStream { buildProperties.load(it) }
+        Map<String, String> expectedProperties = [
+                version: pluginVersion,
+                buildNumber: buildNumber,
+                artifactFileName: artifactFileName,
+                javaTarget: javaTarget.toString(),
+                paperTarget: paperTarget,
+                paperApiVersion: paperApiVersion,
+                paperBuild: paperBuild,
+                paperChannel: paperChannel,
+                paperServerJarFileName: paperServerJarFileName,
+                paperServerSha256: paperServerSha256,
+                docsUrl: docsUrl,
+                sourceUrl: sourceUrl
+        ]
+        expectedProperties.each { key, expected ->
+            if (buildProperties.getProperty(key) != expected) {
+                failures.add("generated build-info.properties ${key} drifted")
+            }
+        }
+
+        String descriptor = generatedPluginDescriptor.getText('UTF-8')
+        [
+                "version: '${pluginVersion}'",
+                "api-version: '${paperTarget}'",
+                "website: '${sourceUrl}'"
+        ].each { expected ->
+            if (!descriptor.contains(expected)) {
+                failures.add("generated plugin.yml is missing ${expected}")
+            }
+        }
+
+        if (!mainJar.isFile()) {
+            failures.add("main artifact is missing at ${mainJar}")
+        }
+        if (mainJar.name != artifactFileName) {
+            failures.add("main artifact name is ${mainJar.name}, expected ${artifactFileName}")
+        }
+        String artifactStem = artifactFileName.substring(0, artifactFileName.length() - '.jar'.length())
+        if (!sourcesJar.isFile()) {
+            failures.add("sources artifact is missing at ${sourcesJar}")
+        }
+        if (sourcesJar.name != "${artifactStem}-sources.jar") {
+            failures.add("sources artifact name is ${sourcesJar.name}, expected ${artifactStem}-sources.jar")
+        }
+        if (!javadocJar.isFile()) {
+            failures.add("Javadoc artifact is missing at ${javadocJar}")
+        }
+        if (javadocJar.name != "${artifactStem}-javadoc.jar") {
+            failures.add("Javadoc artifact name is ${javadocJar.name}, expected ${artifactStem}-javadoc.jar")
+        }
+        String mainArtifactSha256 = java.security.MessageDigest.getInstance('SHA-256')
+                .digest(mainJar.bytes)
+                .encodeHex()
+                .toString()
+        new java.util.jar.JarFile(mainJar).withCloseable { jar ->
+            def attributes = jar.manifest.mainAttributes
+            [
+                    'Implementation-Version': pluginVersion,
+                    'Build-Number': buildNumber,
+                    'Build-Artifact': artifactFileName,
+                    'Build-Java-Target': javaTarget.toString(),
+                    'Build-Paper-Target': paperTarget,
+                    'Build-Paper-API': paperApiVersion,
+                    'Build-Paper-Server-Build': paperBuild,
+                    'Build-Paper-Channel': paperChannel,
+                    'Build-Paper-Server-Jar': paperServerJarFileName,
+                    'Build-Paper-Server-SHA256': paperServerSha256
+            ].each { key, expected ->
+                if (attributes.getValue(key) != expected) {
+                    failures.add("JAR manifest ${key} drifted")
+                }
+            }
+
+            def classEntry = jar.getJarEntry('com/mrfloris/exportbook/ExportBookPlugin.class')
+            if (classEntry == null) {
+                failures.add('main plugin class is missing from the JAR')
+            } else {
+                jar.getInputStream(classEntry).withCloseable { stream ->
+                    byte[] header = stream.readNBytes(8)
+                    int major = header.length == 8
+                            ? ((header[6] & 0xff) << 8) | (header[7] & 0xff)
+                            : -1
+                    if (major != 69) {
+                        failures.add("main plugin class major version is ${major}, expected 69 (Java 25)")
+                    }
+                }
+            }
+        }
+
+        Set<String> expectedArtifactNames = [
+                artifactFileName.toString(),
+                "${artifactStem}-sources.jar".toString(),
+                "${artifactStem}-javadoc.jar".toString()
+        ] as Set
+        def artifactPattern =
+                ~/1MB-BookExport-v\d+\.\d+\.\d+-\d{3}-j\d+-[\d.]+(?:-(?:sources|javadoc))?\.jar/
+        def paperApiPattern = ~/(?i)\b\d+\.\d+\.build\.\d+-(?:alpha|beta|stable)\b/
+        def jdkPatchPattern = ~/(?<![\d.])(?:25\.0\.\d+|26\.0\.\d+)(?![\d.])/
+        def releaseBuildPattern = ~/(?i)\b(?:release\s+)?build(?:\s+|:\s*)[`"'#]?(\d{3})\b/
+        def paperTargetPattern = ~/(?i)\bPaper(?:\s+API)?\s+(\d+\.\d+(?:\.\d+)?)\b/
+        def structuredPaperTargetPattern = ~/(?i)^\s*paper_target:\s*["']?(\d+\.\d+(?:\.\d+)?)\b/
+        def paperReleaseBuildPattern =
+                ~/(?i)\bPaper\s+\d+(?:\.\d+){1,2}(?:\s+`?(?:stable|beta|alpha)`?)?\s+build\s+#?(\d+)\b/
+        def paperApiBuildPattern = ~/(?i)\bPaper\s+API\s+build\s+#?(\d+)\b/
+        def structuredPaperBuildPattern = ~/(?i)^\s*paper_build:\s*["']?(\d+)\b/
+        def paperJarPattern = ~/\bPaper-\d+(?:\.\d+){1,2}(?:-\d+)?\.jar\b/
+        def explicitJavaTargetPatterns = [
+                ~/(?i)(?:Java\s+(?:bytecode|target|toolchain)|--release|java_target:)\D{0,24}(\d{1,2})\b/,
+                ~/(?i)\bJava\s+(\d{1,2})\s+(?:bytecode|class(?:-file)?s?|toolchain)\b/,
+                ~/(?i)\b(?:targets?|compiled\s+for|requires?)\D{0,32}\bJava\s+(\d{1,2})(?![\d.])/,
+                ~/(?i)\bJava\s+(\d{1,2})\s+(?:or\s+newer|or\s+later)\b/
+        ]
+        def paperChannelPatterns = [
+                ~/(?i)\bPaper\s+\d+(?:\.\d+){1,2}\s+`?(stable|beta|alpha)`?\s+build\b/,
+                ~/(?i)\bPaper\s+\d+(?:\.\d+){1,2}.{0,40}?\b(stable|beta|alpha)\s+channel\b/,
+                ~/(?i)\b(stable|beta|alpha)\s+Paper\s+\d+(?:\.\d+){1,2}\b/,
+                ~/(?i)^\s*paper_channel:\s*["']?(stable|beta|alpha)\b/
+        ]
+        def bookExportVersionPatterns = [
+                ~/(?i)\bBookExport(?:\s+version)?\s*(?:\|\s*)?[`"']?(\d+\.\d+\.\d+)\b/,
+                ~/(?i)\/version\s+BookExport.{0,48}?(\d+\.\d+\.\d+)\b/,
+                ~/(?i)\bThe\s+(\d+\.\d+\.\d+)\s+release\b/,
+                ~/(?i)\bCompleted\s+for\s+the\s+(\d+\.\d+\.\d+)\s+compatibility\s+cycle\b/,
+                ~/^\s*version:\s*["']?(\d+\.\d+\.\d+)\b/
+        ]
+        def negativeCompatibilityPattern =
+                ~/(?i)\b(?:unsupported|not\s+supported|does\s+not\s+support)\b/
+        String historicalReleaseMarker = '<!-- release-metadata-history -->'
+        releaseDocumentationFiles.files.each { documentationFile ->
+            String content = documentationFile.getText('UTF-8')
+            content.eachLine { line ->
+                boolean historicalReleaseLine = line.contains(historicalReleaseMarker)
+                if (!historicalReleaseLine) {
+                    def artifactMatcher = artifactPattern.matcher(line)
+                    while (artifactMatcher.find()) {
+                        if (!expectedArtifactNames.contains(artifactMatcher.group())) {
+                            failures.add("${documentationFile} contains stale artifact ${artifactMatcher.group()}")
+                        }
+                    }
+
+                    def jdkPatchMatcher = jdkPatchPattern.matcher(line)
+                    while (jdkPatchMatcher.find()) {
+                        if (!(jdkPatchMatcher.group() in [buildJdkVersion, compatibilityJdkVersion])) {
+                            failures.add("${documentationFile} contains stale JDK patch ${jdkPatchMatcher.group()}")
+                        }
+                    }
+
+                    def releaseBuildMatcher = releaseBuildPattern.matcher(line)
+                    while (releaseBuildMatcher.find()) {
+                        if (releaseBuildMatcher.group(1) != buildNumber) {
+                            failures.add("${documentationFile} contains stale BookExport build ${releaseBuildMatcher.group(1)}")
+                        }
+                    }
+
+                    def paperJarMatcher = paperJarPattern.matcher(line)
+                    while (paperJarMatcher.find()) {
+                        if (paperJarMatcher.group() != paperServerJarFileName) {
+                            failures.add("${documentationFile} contains stale Paper jar ${paperJarMatcher.group()}")
+                        }
+                    }
+
+                    bookExportVersionPatterns.each { pattern ->
+                        def versionMatcher = pattern.matcher(line)
+                        while (versionMatcher.find()) {
+                            if (versionMatcher.group(1) != pluginVersion) {
+                                failures.add("${documentationFile} contains stale BookExport version ${versionMatcher.group(1)}")
+                            }
+                        }
+                    }
+
+                    explicitJavaTargetPatterns.each { pattern ->
+                        def explicitJavaTargetMatcher = pattern.matcher(line)
+                        while (explicitJavaTargetMatcher.find()) {
+                            if (explicitJavaTargetMatcher.group(1).toInteger() != javaTarget) {
+                                failures.add("${documentationFile} contains stale Java target ${explicitJavaTargetMatcher.group(1)}")
+                            }
+                        }
+                    }
+
+                    line.split(/(?i)\s*(?:[.;]\s+|\b(?:while|but|whereas)\b)\s*/).each { clause ->
+                        boolean negativeCompatibilityClause =
+                                negativeCompatibilityPattern.matcher(clause).find()
+                        if (!negativeCompatibilityClause) {
+                            def paperApiMatcher = paperApiPattern.matcher(clause)
+                            while (paperApiMatcher.find()) {
+                                if (!paperApiMatcher.group().equalsIgnoreCase(paperApiVersion)) {
+                                    failures.add("${documentationFile} contains stale Paper API ${paperApiMatcher.group()}")
+                                }
+                            }
+
+                            [paperTargetPattern, structuredPaperTargetPattern].each { pattern ->
+                                def paperTargetMatcher = pattern.matcher(clause)
+                                while (paperTargetMatcher.find()) {
+                                    if (paperTargetMatcher.group(1) != paperTarget) {
+                                        failures.add("${documentationFile} contains stale Paper target ${paperTargetMatcher.group(1)}")
+                                    }
+                                }
+                            }
+
+                            [paperReleaseBuildPattern, paperApiBuildPattern, structuredPaperBuildPattern].each { pattern ->
+                                def paperBuildMatcher = pattern.matcher(clause)
+                                while (paperBuildMatcher.find()) {
+                                    if (paperBuildMatcher.group(1) != paperBuild) {
+                                        failures.add("${documentationFile} contains stale Paper build ${paperBuildMatcher.group(1)}")
+                                    }
+                                }
+                            }
+
+                            paperChannelPatterns.each { pattern ->
+                                def paperChannelMatcher = pattern.matcher(clause)
+                                while (paperChannelMatcher.find()) {
+                                    if (!paperChannelMatcher.group(1).equalsIgnoreCase(paperChannel)) {
+                                        failures.add("${documentationFile} contains stale Paper channel ${paperChannelMatcher.group(1)}")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Map<File, List<String>> requiredDocumentationTokens = new LinkedHashMap<>()
+        requiredDocumentationTokens.put(file('README.md'), [
+                        pluginVersion,
+                        "build `${buildNumber}`",
+                        paperApiVersion,
+                        "${paperChannel} build ${paperBuild}",
+                        paperServerJarFileName,
+                        paperServerSha256,
+                        artifactFileName,
+                        mainArtifactSha256,
+                        buildJdkVersion,
+                        compatibilityJdkVersion
+                ])
+        requiredDocumentationTokens.put(file('docs/installation.md'), [
+                        "${pluginVersion} build ${buildNumber}",
+                        paperApiVersion,
+                        artifactFileName,
+                        buildJdkVersion,
+                        compatibilityJdkVersion
+                ])
+        requiredDocumentationTokens.put(file('checklist-bookexport.md'), [
+                        "Build ${buildNumber}",
+                        artifactFileName,
+                        "build ${paperBuild}",
+                        mainArtifactSha256,
+                        buildJdkVersion,
+                        compatibilityJdkVersion
+                ])
+        requiredDocumentationTokens.put(file('docs/plugin-docs.yml'), [
+                        "version: \"${pluginVersion}\"",
+                        "build: \"${buildNumber}\"",
+                        "artifact: \"${artifactFileName}\"",
+                        "java_target: \"${javaTarget}\"",
+                        "paper_target: \"${paperTarget}\"",
+                        "paper_api: \"${paperApiVersion}\"",
+                        "paper_build: \"${paperBuild}\"",
+                        "paper_channel: \"${paperChannel}\""
+                ])
+        requiredDocumentationTokens.put(file('feature-improvements-bookexport.md'), [
+                        pluginVersion,
+                        "build ${buildNumber}",
+                        paperApiVersion,
+                        mainArtifactSha256,
+                        buildJdkVersion,
+                        compatibilityJdkVersion
+                ])
+        requiredDocumentationTokens.each { documentationFile, tokens ->
+            String content = documentationFile.getText('UTF-8')
+            tokens.each { token ->
+                if (!content.contains(token)) {
+                    failures.add("${documentationFile} is missing release token ${token}")
+                }
+            }
+        }
+
+        if (!failures.isEmpty()) {
+            throw new GradleException("Release metadata drift detected:\n - " + failures.join('\n - '))
+        }
+        println "Release metadata verified: ${pluginVersion} build ${buildNumber}, Java ${javaTarget}, Paper ${paperTarget} build ${paperBuild} ${paperChannel}."
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyReleaseMetadata')
 }
 
 tasks.build.finalizedBy(tasks.named('printBuildConfig'))

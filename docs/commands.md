@@ -13,12 +13,13 @@ console/player can be run by either sender type.
 | `/bookexport stage [title]` | Player | `bookexport.export`; a supplied title also needs `bookexport.export.custom-title` | Always create a staged draft, even when the configured workflow is direct. A book and quill requires a supplied title. |
 | `/bookexport <title>` | Player | `bookexport.export` and `bookexport.export.custom-title` | Legacy custom-title shorthand that follows the configured workflow. Prefer the explicit `export` or `stage` form. |
 | `/bookexport info` | Console/player | `bookexport.info` | Show the player-facing introduction, installed version/build, compatibility, current workflow, useful starting commands, and canonical docs link. |
+| `/bookexport version` | Console/player | `bookexport.info` | Exact alias for `/bookexport info`. It is reserved and never falls through to the legacy custom-title route. |
 | `/bookexport help` | Console/player | `bookexport.help` | Show only commands the sender may use. |
 | `/bookexport ?` | Console/player | `bookexport.help` | Alias for `/bookexport help`. |
 
 Use the explicit route when a title is also a reserved subcommand. For example,
 `/bookexport stage info` stages a book with the requested title `info`, while
-`/bookexport info` opens plugin information.
+`/bookexport info` and `/bookexport version` open plugin information.
 
 ## File Lists
 
@@ -47,6 +48,9 @@ the safe `fail` mode.
 | `/bookexport admin publish <staged-file> [fail\|unique\|replace]` | Console/player | `bookexport.admin.publish`; `replace` also needs `bookexport.admin.replace` | Publish a verified staged draft. An omitted mode uses the configured default. |
 | `/bookexport admin history [page]` | Console/player | `bookexport.admin.history` | List retained publication records newest first. |
 | `/bookexport admin history show <manifest-id>` | Console/player | `bookexport.admin.history` | Show one retained record using its complete UUID. |
+| `/bookexport admin recovery` | Console/player | `bookexport.admin.recovery` | List incomplete publication transactions, starting at page 1. This is strictly read-only. |
+| `/bookexport admin recovery list [page]` | Console/player | `bookexport.admin.recovery` | List incomplete or residual journal records newest first. Pages must be positive integers. |
+| `/bookexport admin recovery show <transaction-id>` | Console/player | `bookexport.admin.recovery` | Reconcile one complete transaction UUID against current checksums without changing files. |
 
 The `.txt` extension may be omitted from a staged filename; BookExport resolves a
 single direct staged text file case-insensitively. Filenames containing spaces are
@@ -66,11 +70,17 @@ command-mode equivalent of `replace`; player help and completion use `replace`.
 Publication does not reload CMI. After verifying the result, an administrator must
 run the appropriate CMI refresh command.
 
+Recovery syntax is deliberately strict: a page number is accepted only after
+`recovery list`, and `show` requires the complete canonical UUID. UUID prefixes,
+bare page numbers, unknown actions, and extra arguments are rejected. List and Show
+never repair, retry, restore, delete, roll back, republish, finalize, or reload CMI.
+
 ## Status, Reload, and Diagnostics
 
 | Command | Context | Permission | Description |
 | --- | --- | --- | --- |
-| `/bookexport admin` | Console/player | `bookexport.admin.status` | Show BookExport version/build, validated workflow, directory health, manifest health, output settings, and the last recorded failure. |
+| `/bookexport admin` | Console/player | `bookexport.admin.status` | Show BookExport version/build, validated workflow, directory health, manifest health, aggregate recovery-journal health, output settings, and the last recorded failure. |
+| `/bookexport status` | Console/player | `bookexport.admin.status` | Exact shortcut for `/bookexport admin status`, including generated artifact, Java target, Paper stable release, and compile API metadata. |
 | `/bookexport admin status` | Console/player | `bookexport.admin.status` | Explicit form of `/bookexport admin`. |
 | `/bookexport reload` | Console/player | `bookexport.admin.reload` | Reload and validate `config.yml`. |
 | `/bookexport admin reload` | Console/player | `bookexport.admin.reload` | Administrative form of the same safe reload. |
@@ -90,10 +100,13 @@ restart; Bukkit `/reload` and hot-reload plugin managers are unsupported.
 - Export, stage, held-book diagnostics, and preview require a player because they
   read the main-hand item.
 - Console can use information, help, lists, review decisions, publication,
-  history, status, reload, and non-book diagnostics.
+  history, read-only recovery inspection, status, reload, and non-book diagnostics.
 - Staged-filename completion requires both the action permission and
   `bookexport.admin.list.staged`, preventing an action-only sender from enumerating
   private draft names.
 - Replacement completion appears only with `bookexport.admin.replace`.
 - History detail completion exposes complete record IDs only to senders with
   `bookexport.admin.history`.
+- Recovery detail completion exposes complete transaction IDs only to senders with
+  `bookexport.admin.recovery`. Ordinary status and workflow diagnostics expose only
+  aggregate recovery health, not IDs, actors, filenames, or checksums.

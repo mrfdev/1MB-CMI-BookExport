@@ -228,6 +228,36 @@ class MessagesTest {
     }
 
     @Test
+    void recoveryNavigationUsesExplicitReadOnlyListRoute() {
+        Component navigation = Messages.recoveryNavigation(ListPage.calculate(30, 2, 10));
+
+        assertRunCommand(navigation.children().get(0), "/bookexport admin recovery list 1");
+        assertRunCommand(navigation.children().get(2), "/bookexport admin recovery list 3");
+    }
+
+    @Test
+    void recoveryEntryCopiesIdAndRunsOnlyReadOnlyShow() {
+        PublicationRecoveryEntry finding = recoveryEntry();
+        Component entry = Messages.recoveryEntry(finding);
+
+        assertNull(entry.clickEvent());
+        assertTextClick(
+                entry.children().get(1),
+                ClickEvent.Action.COPY_TO_CLIPBOARD,
+                finding.transactionId().toString()
+        );
+        assertHasTextClick(
+                entry,
+                ClickEvent.Action.RUN_COMMAND,
+                "/bookexport admin recovery show " + finding.transactionId()
+        );
+        assertFalse(entry.children().stream()
+                .map(Component::clickEvent)
+                .filter(click -> click != null)
+                .anyMatch(click -> click.action() == ClickEvent.Action.SUGGEST_COMMAND));
+    }
+
+    @Test
     void copyableInfoKeepsClickOnValueOnly() {
         Component info = Messages.copyableInfo("SHA-256", "abcdef");
 
@@ -311,6 +341,39 @@ class MessagesTest {
                 ),
                 "rules.txt",
                 "rules.txt"
+        );
+    }
+
+    private static PublicationRecoveryEntry recoveryEntry() {
+        UUID transactionId = UUID.fromString("323e4567-e89b-12d3-a456-426614174000");
+        PublicationTransaction transaction = PublicationTransaction.prepared(
+                transactionId,
+                Instant.parse("2026-07-14T12:00:00Z"),
+                nativeManifest().withApproval(new DraftManifest.ReviewDecision(
+                        Instant.parse("2026-07-14T12:00:00Z"),
+                        new DraftManifest.Actor("Reviewer", null),
+                        nativeManifest().effectiveFingerprint(),
+                        false
+                )),
+                new DraftManifest.Actor("Publisher", null),
+                PublishCollisionMode.FAIL,
+                "rules.txt",
+                "20260714-120000-000_published_rules_323e4567-e89b-12d3-a456-426614174000.txt",
+                null,
+                null,
+                "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
+        );
+        return new PublicationRecoveryEntry(
+                transactionId + PublicationTransactionStore.JOURNAL_SUFFIX,
+                transactionId,
+                transaction,
+                PublicationRecoveryAssessment.ABANDONED_BEFORE_LIVE_COMMIT,
+                ArtifactObservation.MATCHES_EXPECTED,
+                ArtifactObservation.MISSING,
+                ArtifactObservation.MISSING,
+                ArtifactObservation.NOT_APPLICABLE,
+                PublicationRecoveryEntry.ManifestObservation.APPROVED_STAGED,
+                transaction.updatedAt()
         );
     }
 }

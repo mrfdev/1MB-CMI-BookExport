@@ -2,10 +2,10 @@
 
 This document separates completed 2.0 modernization work from proposed follow-up work. It is intentionally a backlog, not a claim that every idea belongs in the plugin.
 
-## Completed for the 2.0.1 beta cycle
+## Completed for the 2.0.2 compatibility cycle
 
-- [x] Target Java 25 and Paper API 26.2 beta build 60.
-- [x] Test runtime compatibility with installed Java 25.0.2 and 26.0.1.
+- [x] Target Java 25 and the exact stable Paper API `26.2.build.84-stable`.
+- [x] Test runtime compatibility with installed Oracle Java 25.0.4 and 26.0.2.
 - [x] Remove deprecated Bungee chat, `ChatColor`, and written-book string APIs.
 - [x] Read written-book Adventure components and writable-book strings through the correct material-specific APIs.
 - [x] Remove the blanket deprecation suppression and treat all compiler warnings as errors.
@@ -45,7 +45,19 @@ This document separates completed 2.0 modernization work from proposed follow-up
 - [x] Claim a content-free creation marker before exposing native staged text, reject incomplete pairs, and resolve manifest companions case-insensitively.
 - [x] Checkpoint a committed live publication before archive/delete work so warnings cannot invite accidental republishing.
 - [x] Keep valid publication history available when an unrelated active sidecar is malformed or case-ambiguous, while direct operations on that draft still fail closed.
-- [x] Pass the build 017 release gate with 165 tests (163 passed and two filesystem-specific skips), Java class-file major version 69, and a Paper 26.2 build 60 console smoke test.
+- [x] Add a strict, content-free publication write-ahead journal under the fixed internal `transactions/` directory without changing config version 3.
+- [x] Precompute exact live, archive, and optional replacement-backup filenames before mutation, with the complete transaction UUID in both history filenames.
+- [x] Split publication into durable `prepared`, `backup-created`, `live-committed`, `manifest-checkpointed`, `archive-created`, `staged-removed`, and `finalized` boundaries.
+- [x] Atomically store and revision-check transaction metadata, flush file and directory state, reject corrupt/ambiguous/symbolic-linked journals, and fail closed on exact-target races.
+- [x] Add read-only startup checksum reconciliation with explicit abandoned, interrupted, residual-complete, conflict, and unreadable assessments.
+- [x] Block an affected draft/staged/live name while its readable transaction is unresolved and block globally when an unreadable journal has no trustworthy scope.
+- [x] Add `/bookexport admin recovery list|show` plus independent `bookexport.admin.recovery`, while keeping ordinary status/startup output aggregate-only.
+- [x] Prohibit automatic journal replay, rollback, retry, republish, deletion, archive completion, manifest promotion, cleanup, and CMI reload.
+- [x] Add fault-injection/reconciliation coverage for every publication boundary, every collision mode, restart-idempotent scans, checksum truth combinations, workflow-root drift, and residual journals.
+- [x] Add sentinel privacy tests proving malformed journal input, scanner findings, exceptions, and object text do not leak book content or absolute workflow paths.
+- [x] Pass the build 017 release gate with 165 tests (163 passed and two filesystem-specific skips), Java class-file major version 69, and a Paper 26.2 build 60 console smoke test; retain it as the pre-journal baseline. <!-- release-metadata-history -->
+- [x] Pass the build 018 gate with 250 tests (248 passed and two filesystem-specific skips), SHA-256 `8dc385aeebecef356b6939c088e5e9a4daeb4cfeead7bd0797007ca20cfefe25`, Java class-file major version 69, the expanded descriptor, and a clean Paper 26.2 build 60 console smoke test. <!-- release-metadata-history -->
+- [x] Pass the build 019 release gate with 253 tests (251 passed and two filesystem-specific skips), SHA-256 `b2c55799ba63e7c7885eb568ff38e0a4d375f697857cb16fdd1e5ec3a26825f5`, Java class-file major version 69, the exact stable Paper API, generated release metadata, command aliases, and build-breaking artifact/documentation drift checks.
 - [x] Rewrite the README and create an in-game beta checklist.
 
 ## Beta priorities
@@ -56,12 +68,12 @@ This document separates completed 2.0 modernization work from proposed follow-up
 - [ ] Prepare repeatable fixture books: one-page, three-page, Unicode, formatted, placeholder, malformed-color, empty-page, and near-limit books.
 - [ ] Decide how player-authored CMI markup should be governed. Current behavior intentionally preserves it and therefore requires trusted export permissions.
 - [ ] Validate the production policy for existing CMI text: default `fail`, deliberate `unique`, or separately authorized backed-up `replace`.
-- [x] Smoke-test CMI 9.8.8.5 and CMILib 1.5.9.9 startup stability on Paper 26.2 beta build 60; in-game behavior remains covered by the beta checklist.
+- [x] Smoke-test CMI 9.8.8.5 and CMILib 1.5.9.9 startup stability on Paper 26.2 stable build 84 under Java 25.0.4 and 26.0.2; in-game behavior remains covered by the beta checklist.
 
 ### P1: publishing workflow follow-ups
 
 - [ ] Optionally run a narrowly configured CMI refresh command after publish; keep it disabled by default.
-- [ ] Add a small transaction journal and startup recovery report for a process or host crash between backup, publication, manifest update, and archive steps. The content-free manifest records lifecycle outcome but is not a crash-recovery journal.
+- [x] Add a durable transaction journal and read-only startup recovery report for a process or host crash between backup, publication, manifest update, archive, staged cleanup, and finalization steps.
 - [ ] Evaluate cross-process file locking or an explicit single-writer policy for destinations that external tools may edit concurrently.
 - [ ] Add a content-aware review report that flags CMI directives, interactive tags, and placeholder tokens without logging raw page content.
 - [ ] Consider an opt-in strict policy that requires explicit approval for every managed and legacy draft; keep the current non-blocking compatibility policy until deliberately configured.
@@ -126,6 +138,7 @@ The current model deliberately keeps publishing power trusted by default.
 | Review manifest integrity | `bookexport.admin.review` | Keep trusted; exposes stager, author, filename, timestamps, and checksums but never page content |
 | Approve/request changes | `bookexport.admin.approve` | Included by `bookexport.admin`; records a review decision bound to exact current bytes |
 | View manifest history | `bookexport.admin.history` | Keep trusted; exposes content-free review and publication audit metadata |
+| Inspect recovery journal | `bookexport.admin.recovery` | Keep trusted; read-only, but exposes transaction IDs, publisher identity, basename filenames, timestamps, states, and checksums |
 | Reload config | `bookexport.admin.reload` | Keep trusted |
 | Runtime/book diagnostics | `bookexport.admin.debug` | Keep trusted; content is intentionally omitted |
 | Publish staged CMI text | `bookexport.admin.publish` | Included by `bookexport.admin`; permits `fail` and `unique`, not replacement by itself |
@@ -136,6 +149,8 @@ Avoid manual checks such as `childPermission || masterPermission`. Bukkit/LuckPe
 
 ## Test automation suggestions
 
+- [x] Strict-codec, atomic-store, all-boundary recovery, restart-idempotence, scoped-blocking, malformed-input privacy, and no-filesystem-mutation tests for the publication journal.
+- [x] Exact planned-path and independently durable backup/live/archive/staged-removal tests for every collision mode, including claimed-target and checksum-race failures.
 - [ ] Unit-test every filename placeholder.
 - [ ] Decouple configuration parsing enough to unit-test path containment/overlap, invalid values, reload rollback, and version 2 direct compatibility without a live Bukkit server.
 - [ ] Add proxy-sender tests for permission-filtered help, scoped tab completion, review/approval/history separation, staged-filename privacy, replacement separation, and explicit child denials.
@@ -153,3 +168,5 @@ Avoid manual checks such as `childPermission || masterPermission`. Bukkit/LuckPe
 - Support for older Paper, Spigot, or Minecraft versions.
 - Hot reload support through Bukkit `/reload` or plugin managers.
 - Silent or unbacked replacement of existing exports.
+- Automatic transaction replay, rollback, republish, archive completion, staged
+  deletion, manifest promotion, journal cleanup, or CMI reload after a crash.

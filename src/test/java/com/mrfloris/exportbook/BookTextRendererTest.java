@@ -80,6 +80,7 @@ class BookTextRendererTest {
                 Path.of("published"),
                 Path.of("archive"),
                 Path.of("backups"),
+                Path.of("transactions"),
                 PublishCollisionMode.FAIL,
                 "%title%",
                 lowercaseFilenames,

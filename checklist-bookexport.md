@@ -4,13 +4,21 @@ Use this checklist for an in-game review on the dedicated Paper 26.2 BookExport 
 
 ## Automated baseline already completed
 
-- [x] Build 017 completed `./gradlew clean build --warning-mode all`: 165 tests, 163 passed, zero failures/errors, and two expected case-variant skips on case-insensitive APFS.
-- [x] The packaged plugin uses Java class-file major version 69 and declares Paper API 26.2.
-- [x] Paper 26.2 beta build 60 started on Java 25.0.2 with CMI 9.8.8.5 and CMILib 1.5.9.9 without a BookExport startup warning or exception.
-- [x] Build 017 live checks covered clean enable/disable, `/bookexport info`, permission-filtered help, and runtime diagnostics without a BookExport warning, error, exception, or deprecated-API message.
+- [x] Build 019 source coverage includes the durable publication journal, exact precomputed publication plans, recovery reconciliation, scoped publication blocking, fault injection at every publication boundary, and content-privacy sentinels.
+- [x] Build 019 uses Oracle JDK 25.0.4 with Java 25 class files and the exact stable compile API `26.2.build.84-stable`.
+- [x] Build 019 completed `./gradlew clean build --warning-mode all` with 253 tests: 251 passed, zero failures/errors, and two expected case-variant skips on case-insensitive APFS.
+- [x] The release drift gate validates generated resources, plugin descriptor, JAR manifest, all three release JARs, Java class-file major version 69, and semantic/build/JDK/Paper/artifact metadata across every maintained documentation page.
+- [x] Paper 26.2 `STABLE` build 84 is installed as `Paper-26.2.jar`; PaperScript's saved and installed SHA-256 values match.
+- [x] Build 019 is smoke-tested on Oracle Java 25.0.4 and 26.0.2 with CMI 9.8.8.5 and CMILib 1.5.9.9.
+- [x] Build 019 live console checks cover clean enable/disable, `/bookexport info`, `/bookexport version`, `/bookexport status`, permission-filtered help, admin/workflow status, clear recovery diagnostics, and shutdown without a BookExport warning, error, exception, or deprecated-API message.
+- [x] The only smoke-test JVM warnings were attributed to Paper-bundled JOML (`sun.misc.Unsafe::objectFieldOffset`, both runtimes) and LuckPerms-bundled Commodore (final-field mutation, Java 26 only), not BookExport.
+- [x] Packaged JAR SHA-256: `b2c55799ba63e7c7885eb568ff38e0a4d375f697857cb16fdd1e5ec3a26825f5`.
 - [x] Automated tests cover review decisions, checksum invalidation and reapproval, legacy publication, history, incomplete creation, malformed sidecars, and corrupt-draft history isolation. Earlier disposable integration testing confirmed that fixture content stayed out of logs and manifests, manifest sidecars stayed out of CMI, and fixtures were removed.
 
-The remaining unchecked items require an actual player/client, permission-group testing, or deliberate failure injection and are not implied by the automated baseline.
+The remaining unchecked items require an actual player/client, permission-group
+testing or deliberate operator verification. The
+publication-boundary fault matrix itself is automated and does not require a tester
+to force-kill the server.
 
 ## Test record
 
@@ -31,42 +39,43 @@ The remaining unchecked items require an actual player/client, permission-group 
 ## Before connecting
 
 - [ ] An administrator confirms the newest BookExport JAR is installed and older copies are removed.
-- [ ] The installed artifact is `1MB-BookExport-v2.0.1-017-j25-26.2.jar`.
-- [ ] `/version BookExport` reports `2.0.1` and `/bookexport info` reports build `017` with a clickable canonical docs link.
-- [ ] `/version` reports Paper 26.2 build 60.
-- [ ] The server runtime reports Java 25 or newer (record the exact version above) and the plugin reports Java target 25.
+- [ ] The installed artifact is `1MB-BookExport-v2.0.2-019-j25-26.2.jar`.
+- [ ] `/version BookExport` reports `2.0.2`; `/bookexport info` and `/bookexport version` report build `019`, exact API `26.2.build.84-stable`, and a clickable canonical docs link.
+- [ ] `/version` reports Paper 26.2 stable build 84.
+- [ ] The server runtime reports Java 25 or newer (record the exact version above) and the plugin reports Java target 25; automated startup coverage used Java 25.0.4 and 26.0.2.
 - [ ] A fresh `config.yml` reports config version 3 and workflow `staged`.
-- [ ] The staging, published, archive, and backup directories exist, are writable, are distinct, and do not contain one another.
+- [ ] The staging, published, archive, backup, and fixed internal transaction directories exist, are writable, are distinct, and do not contain one another.
 - [ ] BookExport, CMI, CMILib, LuckPerms, and PlaceholderAPI are green in `/plugins`.
 - [ ] Startup logs contain no BookExport `WARN`, `ERROR`, exception, class-loading failure, legacy-plugin warning, or deprecated-API warning.
 - [ ] The tester knows which disposable published filename may be replaced and which permission set to use for each test.
 
 ## Information, help, and completion
 
-- [ ] `/bookexport info` shows the correct version, build, Paper target, Java target, server version, and repository.
+- [ ] `/bookexport info` and `/bookexport version` show the correct version, build, Paper stable build/channel, exact compile API, Java target, server version, and repository.
+- [ ] `/bookexport status` and `/bookexport admin status` show identical generated release metadata and workflow health.
 - [ ] The repository link is clickable.
 - [ ] `/bookexport help` is readable and shows only commands available to the tester.
-- [ ] Help documents `export`, `stage`, scoped `list`, `admin review`, `admin approve`, `admin changes`, `admin history`, `admin publish`, and `debug workflow` when the sender has their permissions.
+- [ ] Help documents `export`, `stage`, scoped `list`, `admin review`, `admin approve`, `admin changes`, `admin history`, read-only `admin recovery`, `admin publish`, and `debug workflow` when the sender has their permissions.
 - [ ] `/bexport help` works as an alias.
 - [ ] First-level tab completion includes permitted commands and hides denied admin commands.
-- [ ] Nested completion includes permitted list scopes, collision modes, debug sections, review/history routes, and staged filenames where applicable.
+- [ ] Nested completion includes permitted list scopes, collision modes, debug sections, review/history/recovery routes, complete recovery transaction IDs, and staged filenames where applicable.
 - [ ] A sender with publish permission but without `bookexport.admin.list.staged` cannot enumerate staged filenames through tab completion.
 - [ ] A sender with both publish and staged-list permissions receives staged filename completion.
 - [ ] Review filename completion requires both `bookexport.admin.review` and staged-list permission.
 - [ ] Approve/changes filename completion requires both `bookexport.admin.approve` and staged-list permission.
 - [ ] A sender with only an action permission cannot enumerate private staged filenames through completion.
 - [ ] A sender without `bookexport.admin.replace` is not offered `replace` completion.
-- [ ] Console can run `bookexport info`, `bookexport help`, lists, review/approval/changes, history, publication, and diagnostics.
+- [ ] Console can run `bookexport info`, `bookexport version`, `bookexport status`, `bookexport help`, lists, review/approval/changes, history, recovery inspection, publication, and diagnostics.
 - [ ] A console export or stage attempt returns a clear player-only message without an exception.
 
 ## Admin status and debug commands
 
-- [ ] `/bookexport admin` and `/bookexport admin status` show version/build, config version, workflow mode, collision mode, four validated directories, writable health, output profile, pagination, metadata, debug logging, and last failure.
+- [ ] `/bookexport admin` and `/bookexport admin status` show version/build, config version, workflow mode, collision mode, five validated directories, writable health, aggregate recovery health, output profile, pagination, metadata, debug logging, and last failure.
 - [ ] Compatibility mode is explicitly identified when a version 2 config is tested.
 - [ ] `/bookexport debug runtime` shows Java runtime/target, Paper API/live server, artifact, directory health, and last failure.
 - [ ] `/bookexport debug book` reports material, signed state, title/author presence, pages, and Java UTF-16 units without showing page contents.
 - [ ] `/bookexport debug cmi` reports detected CMI, CMILib, and PlaceholderAPI versions plus CMI rendering settings.
-- [ ] `/bookexport debug workflow` reports config/workflow mode, all four directories and counts, writable health, and collision mode without page content.
+- [ ] `/bookexport debug workflow` reports config/workflow mode, all five directories and counts, writable health, collision mode, and aggregate recovery health without page content.
 - [ ] `/bookexport debug preview <title>` reports destination scope, sanitized filename candidate, pages, UTF-16 units, and bytes but writes no file.
 - [ ] Preview identifies `staged` in staged mode and `published` in direct mode.
 - [ ] `/bookexport admin debug ...` matches the top-level debug behavior.
@@ -91,15 +100,17 @@ Test with an unprivileged player, narrow individual nodes, the master node, and 
 - [ ] Manifest review is denied without `bookexport.admin.review`.
 - [ ] Approval and changes-requested decisions are denied without `bookexport.admin.approve`.
 - [ ] Manifest history is denied without `bookexport.admin.history`.
+- [ ] Recovery transaction detail is denied without `bookexport.admin.recovery`.
 - [ ] `bookexport.admin.review` alone cannot approve, request changes, publish, or browse history.
 - [ ] `bookexport.admin.approve` alone cannot enumerate staged filenames through tab completion.
 - [ ] `bookexport.admin.history` alone can inspect retained records but cannot change review or publication state.
+- [ ] `bookexport.admin.recovery` alone can list/show content-free journal reconciliation but cannot publish, retry, delete, roll back, reload CMI, or enumerate unrelated staged files.
 - [ ] Publication is denied without `bookexport.admin.publish`.
 - [ ] `fail` and `unique` publication work with `bookexport.admin.publish`.
 - [ ] `replace` is denied without the independent `bookexport.admin.replace` node.
 - [ ] Reload is denied without `bookexport.admin.reload`.
 - [ ] Debug is denied without `bookexport.admin.debug`.
-- [ ] `bookexport.admin` grants every documented non-replacing capability, including review, approval, history, and publication, but does not grant replacement.
+- [ ] `bookexport.admin` grants every documented non-replacing capability, including review, approval, history, read-only recovery, and publication, but does not grant replacement.
 - [ ] Granting `bookexport.admin.replace` alone does not grant listing or publication.
 - [ ] `replace` works only when both publish and replace nodes are effective.
 - [ ] An explicit LuckPerms denial of a child node remains denied when `bookexport.admin` is granted.
@@ -164,6 +175,8 @@ Use disposable managed drafts and preserve exact copies of the `.txt` and sideca
 - [ ] No sidecar appears in `/bookexport list published|staged|archive|backups`; those scopes continue to list regular `.txt` files only.
 - [ ] No `.bookexport-manifest.properties` file is copied into CMI's CustomText directory.
 - [ ] Case-only manifest/marker variants cannot bypass association checks, and ambiguous variants fail closed.
+- [ ] A publication transaction sidecar contains only schema/state, IDs, basename-only filenames, actors, timestamps, mode, byte counts, SHA-256 values, and a workflow-root fingerprint; it contains no book body or absolute path.
+- [ ] Neither startup recovery summaries nor ordinary status/workflow diagnostics expose transaction IDs, actors, filenames, or checksums without `bookexport.admin.recovery`.
 
 ### Review, approval, and changes requested
 
@@ -202,6 +215,39 @@ Use disposable managed drafts and preserve exact copies of the `.txt` and sideca
 - [ ] One unrelated malformed or case-ambiguous active sidecar is omitted from history discovery without hiding other valid pending/finalized records; direct operations on that bad draft still fail closed and status counts an error.
 - [ ] Two revisions using the same intended filename remain separately addressable by stable UUID.
 - [ ] History records survive a clean server restart and retain review/publication actors, timestamps, checksums, and outcomes.
+
+## Publication journal and read-only recovery
+
+These implementation checks are automated. The later unchecked items verify the
+operator-facing behavior on a real server without asking a tester to reproduce an
+unsafe force-kill.
+
+### Automated crash-boundary coverage
+
+- [x] Every staged publication precomputes exact staged, live, archive, and optional backup basenames before its first live mutation.
+- [x] Archive and replacement-backup names include the complete publication transaction UUID, making the journal plan unambiguous before mutation.
+- [x] Journal writes are strict UTF-8, size-bounded, atomically replaced, file/directory flushed, revision-checked, and reject unknown, duplicate, malformed, future-schema, symlinked, or filename/UUID-mismatched records.
+- [x] Durable states cover `prepared`, replacement-only `backup-created`, `live-committed`, `manifest-checkpointed`, `archive-created`, `staged-removed`, and `finalized` in their only valid order.
+- [x] Physical phases separately create a replacement backup, commit live bytes, create the archive, and remove the staged source, with checksum verification between boundaries.
+- [x] Recovery scanning is restart-idempotent and read-only: repeated scans do not write, rename, remove, republish, roll back, archive, finalize, or reload anything.
+- [x] Scanner tests reconcile staged, live, archive, backup, and manifest evidence when a process stops immediately before or after every durable boundary.
+- [x] Tests cover `fail`, `unique`, and `replace-with-backup`, including exact-target claims, case ambiguity, checksum mismatch, old-live matching, workflow-root drift, damaged journals, and residual completed journals.
+- [x] Unreadable or unknown-scope journals block publication globally; readable unresolved records block their matching draft, staged filename, or live filename without blocking unrelated work.
+- [x] Privacy tests inject `TOP_SECRET_BOOK_PAGE_7F91` into malformed input and prove transaction encoding, scanner findings, exceptions, and object text do not expose it.
+
+### Startup, commands, permissions, and manual evidence
+
+- [ ] A clear transaction directory produces a clear aggregate recovery summary at startup and in `/bookexport admin status`.
+- [ ] An unresolved record logs aggregate `INFO`/`WARN`/`CRITICAL` counts and tells staff to run `recovery list`; startup does not print its ID, actor, filenames, or checksums.
+- [ ] `/bookexport admin recovery` and `recovery list [page]` show newest-first content-free records with correct positive-page validation and no mutation controls.
+- [ ] `/bookexport admin recovery show <complete-uuid>` rejects prefixes/malformed IDs and shows state, assessment, actor, mode, basename-only filenames, expected byte counts/SHA-256 values, and artifact/manifest observations.
+- [ ] Recovery list/show player controls copy or run only read-only inspection commands; they never suggest publish, retry, delete, rollback, archive, finalize, or CMI reload.
+- [ ] A before/after filesystem snapshot proves `recovery list`, `recovery show`, startup scan, status, and workflow diagnostics change no workflow or transaction file.
+- [ ] A same-draft publication is denied while its unresolved journal remains; a demonstrably unrelated draft remains publishable unless an unreadable/global record exists.
+- [ ] Restarting with the same unresolved fixture yields the same assessment and observations without advancing its journal revision or timestamps.
+- [ ] A workflow-root change against an unresolved record becomes a manual-review conflict rather than silently associating the journal with new directories.
+- [ ] Staff follow [Troubleshooting](docs/troubleshooting.md#manual-reconciliation-procedure): stop affected writes, take a complete private backup, independently verify byte counts/SHA-256, and preserve evidence instead of deleting the journal to silence it.
+- [ ] BookExport performs no automatic rollback, retry, republish, deletion, archive completion, manifest promotion, journal cleanup, or CMI reload for any recovery assessment.
 
 ## Direct workflow and explicit staging
 
@@ -257,6 +303,7 @@ Use a disposable `beta_publish.txt` draft and compare exact file bytes before/af
 - [ ] The manifest records publisher, UTC publication time, `fail` mode, final filename, final SHA-256, archive filename, no backup, and successful outcome.
 - [ ] The manifest reaches `published-archive-pending` immediately after the live commit and before the staged file is archived or removed.
 - [ ] The final SHA-256 exactly matches the live published bytes and the bytes approved explicitly or implicitly.
+- [ ] The archive filename ends with the complete publication transaction UUID, and a cleanly finalized publication leaves no transaction journal behind.
 - [ ] The sidecar is not copied to the published CMI directory.
 - [ ] Publishing does not run `/cmi reload`; CMI changes only after an administrator reloads it.
 
@@ -288,6 +335,7 @@ Use a disposable `beta_publish.txt` draft and compare exact file bytes before/af
 - [ ] The manifest records `replace-with-backup`, final checksum, backup filename, archive filename, publisher, UTC time, and successful outcome.
 - [ ] A case-only target match is handled as the same published name.
 - [ ] `replace` fails safely when no published target exists; the draft remains and no misleading backup is created.
+- [ ] The replacement backup filename ends with the same complete transaction UUID as its planned archive.
 - [ ] No `.bookexport-publish-*` or `.bookexport-history-*` temporary files remain after success.
 
 ### Invalid and failure cases
@@ -301,9 +349,9 @@ Use a disposable `beta_publish.txt` draft and compare exact file bytes before/af
 - [ ] A staged directory, symlink, or other non-regular-file fixture is rejected.
 - [ ] A non-regular or symbolic-link replacement target is rejected.
 - [ ] A simulated publication write/move failure retains both the staged draft and existing published file.
-- [ ] A simulated archive failure reports that publication succeeded, retains the staged draft when possible, and remains visible as `Last failure`.
+- [ ] A simulated archive failure reports that the live commit succeeded, retains the staged draft when possible, remains visible in recovery inspection, and records a useful `Last failure`.
 - [ ] After an archive failure, the manifest distinguishes successful publication from the archive warning and records the final live checksum.
-- [ ] A manifest-update failure never produces a misleading command response that claims an unrecorded state; inspect the retained files and logs for the controlled recovery condition.
+- [ ] A manifest-update failure never produces a misleading command response that claims an unrecorded state; the durable journal and checksum observations expose the controlled recovery condition.
 
 ## Filename behavior
 
@@ -367,6 +415,7 @@ Repeat a small fixture containing legacy colors, hex colors, bold, underline, it
 ## Configuration paths and reload validation
 
 - [ ] `staging`, `archive`, and `backups` resolve inside `plugins/BookExport/`.
+- [ ] The fixed `plugins/BookExport/transactions/` directory is not configurable, is a regular non-symbolic-link directory, and does not overlap another workflow root.
 - [ ] `~/plugins/CMI/CustomText/` resolves from the Paper server root.
 - [ ] An allowed absolute test path works.
 - [ ] A relative `../` escape is rejected.
@@ -406,10 +455,11 @@ Use a backup or disposable server copy. Preserve hashes/timestamps for the old c
 - [ ] Stop the server cleanly; do not force-kill it.
 - [ ] Review `logs/latest.log` for BookExport warnings, errors, exceptions, deprecated, legacy, unsupported, `NoClassDefFoundError`, `ClassNotFoundException`, or `LinkageError` messages.
 - [ ] Separate BookExport findings from unrelated warnings emitted by other plugins.
-- [ ] Restart once and confirm valid config and all four workflow scopes remain intact.
+- [ ] Restart once and confirm valid config and all five workflow scopes remain intact.
 - [ ] Confirm no administrator setting is unexpectedly rewritten.
 - [ ] Confirm staged sidecars remain readable and retain the same stable IDs, actors, timestamps, states, and checksums after restart.
 - [ ] Confirm `/bookexport admin history [page]` returns the same retained record order after restart.
+- [ ] Confirm `/bookexport admin recovery list` is empty after clean completed publications, or shows the identical read-only assessment for each deliberately retained fixture.
 - [ ] Confirm published, archived, and backup bytes remain intact after restart.
 - [ ] Search the full BookExport log output and manifest sidecars for distinctive fixture page text; none is present outside the intended `.txt`/archive content files.
 - [ ] Confirm BookExport disables cleanly without an asynchronous-task warning.
@@ -426,6 +476,9 @@ Permission nodes:
 Held item:
 Staged/published/archive/backup filenames:
 Manifest ID and state:
+Transaction ID and durable state:
+Recovery assessment and severity:
+Staged/live/archive/backup observations:
 Initial/reviewed/published SHA-256 values:
 Expected result:
 Actual result:

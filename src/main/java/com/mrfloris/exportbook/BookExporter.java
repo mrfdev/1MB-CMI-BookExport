@@ -36,6 +36,7 @@ final class BookExporter {
     private final ExportBookPlugin plugin;
     private final Clock clock;
     private final DraftManifestStore manifestStore;
+    private final PublicationCoordinator publicationCoordinator;
 
     BookExporter(ExportBookPlugin plugin) {
         this(plugin, Clock.systemDefaultZone());
@@ -45,6 +46,15 @@ final class BookExporter {
         this.plugin = plugin;
         this.clock = clock;
         this.manifestStore = new DraftManifestStore(clock);
+        PublicationTransactionStore transactionStore = new PublicationTransactionStore(
+                plugin.settings().transactionDirectory(),
+                clock
+        );
+        this.publicationCoordinator = new PublicationCoordinator(
+                clock,
+                manifestStore,
+                transactionStore
+        );
     }
 
     ExportPreview preview(Player player, String requestedTitle) throws BookExportException {
@@ -331,99 +341,27 @@ final class BookExporter {
             PublishCollisionMode collisionMode,
             DraftManifest.Actor actor
     ) throws BookExportException {
-        ExportSettings settings = plugin.settings();
-        Path stagedPath = resolveStagedPath(stagedFilename);
-        DraftReview approved;
-        try {
-            approved = manifestStore.verifyOrAdoptBeforePublish(stagedPath, actor);
-        } catch (IOException exception) {
-            throw manifestFailure("verify for publication", stagedPath, exception);
-        }
-
         PublishResult result;
         try {
-            result = BookFileStore.publishLive(
-                    settings.stagingDirectory(),
-                    settings.publishedDirectory(),
-                    settings.archiveDirectory(),
-                    settings.backupDirectory(),
+            result = publicationCoordinator.publish(
+                    plugin.settings(),
                     stagedFilename,
-                    collisionMode,
-                    settings.maximumFilenameLength(),
-                    clock,
-                    approved.manifest().effectiveFingerprint()
-            );
-        } catch (IOException exception) {
-            plugin.getLogger().log(Level.SEVERE, "Unable to publish staged BookExport file.", exception);
-            throw new BookExportException("Unable to publish the staged file. Check the server log.", exception);
-        }
-
-        DraftManifest publicationManifest = null;
-        String manifestWarning = null;
-        try {
-            publicationManifest = manifestStore.checkpointCommittedPublication(
-                    result.stagedPath(),
-                    approved.manifest(),
-                    result.publishedPath(),
-                    result.backupPath(),
-                    result.backupFingerprint(),
                     collisionMode,
                     actor
             );
-            result = result.withManifest(publicationManifest, null);
-        } catch (IOException exception) {
-            manifestWarning = "Publication succeeded, but its manifest checkpoint could not be stored. "
-                    + "The staged draft was kept; do not publish it again. Inspect the live file and server log.";
-            plugin.getLogger().log(
-                    Level.SEVERE,
-                    "Published BookExport draft but failed to checkpoint manifest "
-                            + approved.manifest().draftId() + ": " + safeMessage(exception),
-                    exception
-            );
-            result = result.withManifest(null, manifestWarning);
-        }
-
-        if (publicationManifest != null) {
-            try {
-                result = BookFileStore.archivePublished(
-                        result,
-                        settings.archiveDirectory(),
-                        clock,
-                        approved.manifest().effectiveFingerprint()
-                ).withManifest(publicationManifest, null);
-            } catch (IOException | BookExportException exception) {
-                String archiveWarning = "Publication succeeded and its manifest is safely checkpointed, "
-                        + "but the staged draft could not be archived and was kept: "
-                        + safeOperationMessage(exception);
-                plugin.getLogger().warning(archiveWarning);
-                result = result.withArchiveOutcome(null, archiveWarning)
-                        .withManifest(publicationManifest, null);
+        } catch (BookExportException exception) {
+            if (exception.getCause() != null) {
+                plugin.getLogger().log(
+                        Level.SEVERE,
+                        "Reviewed BookExport publication did not complete: "
+                                + boundedSingleLineMessage(exception.getMessage(), "publication failed"),
+                        exception
+                );
+            } else if (plugin.settings().debugLogging()) {
+                plugin.getLogger().info("Rejected reviewed publication: "
+                        + boundedSingleLineMessage(exception.getMessage(), "validation failed"));
             }
-
-            if (result.archived() && !result.hasArchiveWarning()) {
-                try {
-                    publicationManifest = manifestStore.finalizePublication(
-                            result.stagedPath(),
-                            result.publishedPath(),
-                            result.archivedPath(),
-                            result.backupPath(),
-                            result.backupFingerprint(),
-                            collisionMode,
-                            actor
-                    );
-                    result = result.withManifest(publicationManifest, null);
-                } catch (IOException exception) {
-                    manifestWarning = "Publication and archival succeeded, but the audit record remains "
-                            + "archive-pending. Do not retry publication; inspect manifest history and the log.";
-                    plugin.getLogger().log(
-                            Level.SEVERE,
-                            "Published and archived BookExport draft but failed to finalize manifest "
-                                    + approved.manifest().draftId() + ": " + safeMessage(exception),
-                            exception
-                    );
-                    result = result.withManifest(publicationManifest, manifestWarning);
-                }
-            }
+            throw exception;
         }
 
         plugin.getLogger().info("Published staged file " + result.stagedPath().getFileName()
@@ -432,8 +370,10 @@ final class BookExporter {
                 + " (collisionMode=" + collisionMode.key()
                 + ", backup=" + filenameOrNone(result.backupPath())
                 + ", archive=" + filenameOrNone(result.archivedPath())
-                + ", manifest=" + approved.manifest().draftId()
-                + ", checksum=" + approved.manifest().effectiveFingerprint().sha256() + ')');
+                + ", manifest=" + (result.manifest() == null
+                ? "recovery-pending" : result.manifest().draftId())
+                + ", checksum=" + (result.manifest() == null
+                ? "recovery-pending" : result.manifest().effectiveFingerprint().sha256()) + ')');
         if (result.hasArchiveWarning()) {
             plugin.getLogger().warning(result.archiveWarning());
         }
@@ -441,6 +381,10 @@ final class BookExporter {
             plugin.getLogger().warning(result.manifestWarning());
         }
         return result;
+    }
+
+    PublicationRecoveryReport recoveryReport() {
+        return publicationCoordinator.recoveryReport(plugin.settings());
     }
 
     private Path resolveStagedPath(String stagedFilename) throws BookExportException {
@@ -476,10 +420,6 @@ final class BookExporter {
 
     private static String safeMessage(IOException exception) {
         return boundedSingleLineMessage(exception.getMessage(), "manifest operation failed");
-    }
-
-    private static String safeOperationMessage(Exception exception) {
-        return boundedSingleLineMessage(exception.getMessage(), "archive operation failed");
     }
 
     private static String boundedSingleLineMessage(String message, String fallback) {

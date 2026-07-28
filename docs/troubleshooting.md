@@ -16,14 +16,15 @@ Paper 26.2 with Java 25 or newer.
 
 ### BookExport does not load on an older server
 
-The descriptor declares `api-version: 26.2`, and the code compiles against Paper
-26.2 beta build 60. Older Paper, Minecraft, Spigot, and Java releases are not
-supported. Install the plugin only on the targeted Paper 26.2 stack.
+The descriptor declares `api-version: 26.2`, and the code compiles against
+`io.papermc.paper:paper-api:26.2.build.84-stable`. Older Paper, Minecraft, Spigot,
+and Java releases are not supported. Install the plugin only on Paper 26.2
+`STABLE` build 84 or a reviewed later same-version stable build.
 
 ### Paper discovers BookExport twice
 
 Stop Paper and leave exactly one BookExport main JAR in `plugins/`. Do not install
-the source or Javadoc JAR, and do not keep build 017 beside an older plugin JAR.
+the source or Javadoc JAR, and do not keep build 019 beside an older plugin JAR.
 Restart cleanly; do not use `/reload` or a hot-reload plugin.
 
 ### BookExport disables itself because configuration is invalid
@@ -167,6 +168,90 @@ manifest history.
 
 ## Publication and recovery
 
+### Startup reports unresolved publication transactions
+
+BookExport found one or more durable records in its fixed internal
+`plugins/BookExport/transactions/` directory. A record normally exists only while
+one publication is crossing its backup, live commit, manifest checkpoint, archive,
+staged-removal, and finalization boundaries. A cleanly completed publication
+removes its journal after the final state is durable.
+
+Startup recovery is deliberately read-only. BookExport does not roll back, retry,
+republish, archive, delete, clean up, reload CMI, or otherwise change a journaled
+result. `/bookexport admin status` shows aggregate information. An administrator
+with `bookexport.admin.recovery` can use:
+
+```text
+/bookexport admin recovery list
+/bookexport admin recovery show <complete-transaction-uuid>
+```
+
+`show` reconciles basename-only journal metadata with the current staged, live,
+archive, backup, and manifest checksums. It does not display book content or mutate
+files. Preserve the transaction ID and every named artifact before investigating.
+Do not retry publication merely because the server restarted.
+
+### What the durable transaction states mean
+
+The recorded state is the last metadata boundary known to be durable. The scanner
+also checks filesystem evidence because a process can stop after a file commit but
+before the next journal update.
+
+| State | Last recorded boundary |
+| --- | --- |
+| `prepared` | Exact content-free plan is durable; no later mutation is asserted. |
+| `backup-created` | The exact old live bytes have a durable replacement backup. Replacement only. |
+| `live-committed` | The planned live filename contains the approved bytes. |
+| `manifest-checkpointed` | The active manifest records the committed live outcome. |
+| `archive-created` | The planned archive contains the approved bytes. |
+| `staged-removed` | The approved staged source has been removed after live/archive verification. |
+| `finalized` | Final manifest history is durable; only journal cleanup remains. |
+
+Do not infer that the next action is safe from the state name alone. Always use the
+assessment and checksum observations from `recovery show`.
+
+### Interpreting recovery assessments
+
+| Assessment | Meaning and safe response |
+| --- | --- |
+| `ABANDONED_BEFORE_LIVE_COMMIT` | The plan exists but the approved bytes are not observed at the planned live target. Preserve the staged draft and journal, verify the existing live name, and reconcile manually before retrying. |
+| `BACKUP_CREATED_NO_LIVE_COMMIT` | A replacement backup matches the old live bytes, but the approved bytes were not committed live. Preserve all three files and review the interrupted replacement manually. |
+| `LIVE_COMMIT_NEEDS_CHECKPOINT` | The approved bytes are live but the matching manifest checkpoint is absent. This is critical: do not republish, replace, delete, or reload based on an assumed failure. |
+| `CHECKPOINT_NEEDS_ARCHIVE` | Live bytes and the pending manifest agree, but a matching archive is not complete. Keep the staged source and all metadata. |
+| `ARCHIVE_NEEDS_SOURCE_CLEANUP` | Live and archive copies agree while the staged source remains. Do not manually delete it until the entire record has been backed up and reviewed. |
+| `ARCHIVE_NEEDS_MANIFEST_FINALIZE` | Live and archive copies agree and the staged source is gone, but final history promotion is incomplete. Preserve the pending and archive metadata. |
+| `COMPLETED_JOURNAL_REMAINS` | Artifacts and final history are consistent, but the journal was not removed. It is informational residue, not permission for automatic deletion. |
+| `CONFLICT_REQUIRES_MANUAL_REVIEW` | State, configuration roots, filenames, manifests, or checksums contradict one another. Stop publication activity for the affected names and investigate from backups. |
+| `UNREADABLE_REQUIRES_MANUAL_REVIEW` | A journal is malformed, unsupported, ambiguous, too large, symbolic-linked, or otherwise unreadable. Because its scope cannot be trusted, publication may be blocked globally until an administrator safely reconciles it. |
+
+Artifact observations are `MISSING`, `MATCHES_EXPECTED`, `MATCHES_ORIGINAL`,
+`MISMATCH`, `AMBIGUOUS`, `UNREADABLE`, or `NOT_APPLICABLE`. A replacement live
+target may legitimately report `MATCHES_ORIGINAL` before the live commit. A
+`MISMATCH`, `AMBIGUOUS`, or `UNREADABLE` observation always requires manual review.
+
+### Manual reconciliation procedure
+
+1. Stop publication and external edits for the affected staged and published names.
+2. Preferably stop the Paper process, then take one backup of staging, published,
+   archive, backups, manifests, and `plugins/BookExport/transactions/` together.
+3. Record `/bookexport admin recovery show <id>` and the matching
+   `/bookexport admin history show <manifest-id>` output. Keep the full output
+   private because it includes actors, filenames, timestamps, IDs, and checksums.
+4. Independently calculate SHA-256 and byte counts for the named regular files.
+   Compare them with the approved and, for replacement, original fingerprints.
+5. Resolve configuration-root drift, case-only duplicates, symbolic links,
+   unexpected external edits, or damaged metadata before considering any file
+   operation.
+6. Decide the repair under administrator change control. BookExport intentionally
+   has no journal replay, rollback, cleanup, or force-complete command.
+7. Restart and inspect recovery again before allowing another publication for the
+   same draft or live filename.
+
+Never delete a journal simply to remove a warning. Never copy staged bytes over a
+live result, restore a backup, remove a staged file, or promote a manifest until its
+checksums and lifecycle evidence have been reviewed. If evidence is incomplete or
+contradictory, preserve it and restore from a known-good full backup instead.
+
 ### Publication reports a collision
 
 The default `fail` policy protects the current live file. Compare the staged and
@@ -190,7 +275,8 @@ directory or avoid `replace`.
 ### Publication succeeds with an archive warning
 
 The live file is already published. Do not immediately retry. Read the exact warning,
-inspect `/bookexport admin history`, and compare the live, staged, and archive files.
+inspect `/bookexport admin recovery list`, inspect manifest history, and compare the
+live, staged, and archive checksums.
 When archival cannot complete safely, BookExport keeps the staged draft and its
 `published-archive-pending` checkpoint to block accidental republishing.
 
@@ -198,8 +284,8 @@ When archival cannot complete safely, BookExport keeps the staged draft and its
 
 The live move succeeded, but BookExport could not persist the immediate audit
 checkpoint. It keeps the staged draft and skips archival. Do not publish the draft
-again. Inspect the live file and server log, preserve the staged data, and reconcile
-the outcome manually before further action.
+again. Inspect the matching recovery transaction, preserve the live and staged data,
+and reconcile their checksums manually before further action.
 
 ### Publication and archival succeed but history remains archive-pending
 
@@ -252,8 +338,9 @@ expansion can leave a token visible.
 - Direct workflow mode bypasses staged review for normal exports.
 - Explicit approval is recommended but is not mandatory for an unchanged unreviewed
   or legacy draft.
-- The publication checkpoint is an audit safeguard, not a complete transaction
-  journal or automatic crash-recovery system.
+- Staged publication uses a durable, content-free transaction journal and read-only
+  checksum reconciliation. It is not an automatic recovery, rollback, retry, or
+  cleanup system. Direct workflow exports do not create publication journals.
 - In-process storage operations are synchronized, but BookExport does not provide a
   cross-process filesystem lock. Do not point multiple Paper processes or external
   writers at the same workflow directories.
@@ -269,8 +356,10 @@ When reporting a problem, collect:
 
 - BookExport version/build from `/bookexport info`;
 - live Java and Paper values from `/bookexport debug runtime`;
-- configuration version, workflow, directory health, manifest counts, and last
-  failure from status/workflow diagnostics;
+- configuration version, workflow, directory health, manifest counts, last failure,
+  and aggregate recovery counts from status/workflow diagnostics;
+- the complete transaction UUID, state, assessment, and artifact observations from
+  `recovery show` when a publication is interrupted;
 - detected CMI, CMILib, and PlaceholderAPI versions from `/bookexport debug cmi`;
 - held material, signed state, page count, and UTF-16 unit count from
   `/bookexport debug book`; and
@@ -278,4 +367,6 @@ When reporting a problem, collect:
 
 Do not post the book body, published server text, full configuration, filesystem
 paths, or manifest sidecars publicly. Manifests contain no pages, but can include
-player names, UUIDs, author names, filenames, timestamps, and checksums.
+player names, UUIDs, author names, filenames, timestamps, and checksums. Transaction
+journals are also content-free, but expose publisher identity, workflow filenames,
+stable IDs, timestamps, and fingerprints; keep them private too.

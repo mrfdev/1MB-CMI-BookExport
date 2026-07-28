@@ -73,6 +73,16 @@ final class Messages {
         return pageNavigation(listPage, previous, next);
     }
 
+    static Component recoveryNavigation(ListPage listPage) {
+        Component previous = listPage.hasPrevious()
+                ? recoveryPageButton("← Previous", listPage.previousPage())
+                : Component.text("[← Previous]", NamedTextColor.DARK_GRAY);
+        Component next = listPage.hasNext()
+                ? recoveryPageButton("Next →", listPage.nextPage())
+                : Component.text("[Next →]", NamedTextColor.DARK_GRAY);
+        return pageNavigation(listPage, previous, next);
+    }
+
     static Component fileEntry(String filename, FileScope scope) {
         return Component.text()
                 .append(Component.text("- ", NamedTextColor.GRAY))
@@ -161,6 +171,42 @@ final class Messages {
                 .build();
     }
 
+    static Component recoveryEntry(PublicationRecoveryEntry entry) {
+        TextComponent.Builder output = Component.text()
+                .append(Component.text("- ", NamedTextColor.GRAY));
+        java.util.UUID transactionId = entry.transactionId();
+        if (transactionId == null) {
+            output.append(Component.text("unreadable", NamedTextColor.RED));
+        } else {
+            String id = transactionId.toString();
+            output.append(Component.text(id.substring(0, 8), NamedTextColor.AQUA)
+                    .clickEvent(ClickEvent.copyToClipboard(id))
+                    .hoverEvent(HoverEvent.showText(Component.text(
+                            "Click to copy the complete transaction ID",
+                            NamedTextColor.GRAY
+                    ))));
+        }
+        output.append(Component.space()).append(Component.text(
+                '[' + enumKey(entry.assessment()) + ']',
+                recoveryColor(entry.severity())
+        ));
+        if (entry.metadataAvailable()) {
+            output.append(Component.space()).append(copyableFilename(
+                    entry.transaction().publishedFilename(),
+                    "Click to copy the planned published filename"
+            ));
+        }
+        if (transactionId != null) {
+            output.append(Component.space()).append(action(
+                    "Show",
+                    NamedTextColor.AQUA,
+                    ClickEvent.runCommand("/bookexport admin recovery show " + transactionId),
+                    "Open the read-only checksum reconciliation"
+            ));
+        }
+        return output.build();
+    }
+
     static Component source(String url) {
         return link("Source", url, "Open the BookExport repository");
     }
@@ -221,6 +267,27 @@ final class Messages {
                         "Open history page " + page,
                         NamedTextColor.GRAY
                 )));
+    }
+
+    private static Component recoveryPageButton(String label, int page) {
+        return Component.text('[' + label + ']', NamedTextColor.AQUA)
+                .clickEvent(ClickEvent.runCommand("/bookexport admin recovery list " + page))
+                .hoverEvent(HoverEvent.showText(Component.text(
+                        "Open recovery list page " + page,
+                        NamedTextColor.GRAY
+                )));
+    }
+
+    private static NamedTextColor recoveryColor(RecoverySeverity severity) {
+        return switch (severity) {
+            case INFO -> NamedTextColor.AQUA;
+            case WARN -> NamedTextColor.GOLD;
+            case CRITICAL -> NamedTextColor.RED;
+        };
+    }
+
+    private static String enumKey(Enum<?> value) {
+        return value.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-');
     }
 
     private static NamedTextColor statusColor(DraftListStatus status) {

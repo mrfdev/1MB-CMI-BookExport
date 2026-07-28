@@ -42,6 +42,7 @@ public final class ExportBookPlugin extends JavaPlugin {
         }
 
         exporter = new BookExporter(this);
+        logRecoverySummary(exporter.recoveryReport());
         BookExportCommand commandHandler = new BookExportCommand(this, exporter);
         PluginCommand command = Objects.requireNonNull(
                 getCommand("bookexport"),
@@ -54,6 +55,10 @@ public final class ExportBookPlugin extends JavaPlugin {
                 + " build " + buildInfo.buildNumber()
                 + " (Java " + buildInfo.javaTarget()
                 + ", Paper " + buildInfo.paperTarget()
+                + " " + buildInfo.paperChannel().toLowerCase(java.util.Locale.ROOT)
+                + " build " + buildInfo.paperBuild()
+                + ", API " + buildInfo.paperApiVersion()
+                + ", artifact=" + buildInfo.artifactFileName()
                 + ", workflow=" + settings.workflowMode().key()
                 + ", staging=" + settings.stagingDirectory()
                 + ", published=" + settings.publishedDirectory() + ")");
@@ -68,6 +73,7 @@ public final class ExportBookPlugin extends JavaPlugin {
         try {
             ExportSettings candidate = loadValidatedSettings();
             settings = candidate;
+            logRecoverySummary(exporter.recoveryReport());
             clearLastFailure();
         } catch (IOException | IllegalArgumentException exception) {
             recordFailure("Configuration reload failed: " + exception.getMessage());
@@ -128,5 +134,23 @@ public final class ExportBookPlugin extends JavaPlugin {
         }
 
         return ExportSettings.load(this, candidate, rawConfigVersion);
+    }
+
+    private void logRecoverySummary(PublicationRecoveryReport report) {
+        if (report.entries().isEmpty()) {
+            getLogger().info("Publication recovery journal is clear.");
+            return;
+        }
+        String summary = "Publication recovery journal requires review: total="
+                + report.entries().size()
+                + ", info=" + report.infoCount()
+                + ", warning=" + report.warningCount()
+                + ", critical=" + report.criticalCount()
+                + ". No automatic recovery was attempted; run /bookexport admin recovery list.";
+        if (report.criticalCount() > 0) {
+            getLogger().severe(summary);
+        } else {
+            getLogger().warning(summary);
+        }
     }
 }

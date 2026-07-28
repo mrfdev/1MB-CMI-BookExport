@@ -56,6 +56,7 @@ configuration.
 | Command | What it does |
 | --- | --- |
 | `/bookexport info` | Shows the introduction, version/build, compatibility, starting commands, and canonical documentation link. |
+| `/bookexport version` | Exact alias for `/bookexport info`. |
 | `/bookexport help` | Shows the commands available to you. |
 | `/bookexport stage [title]` | Always stages the held book for review. A book and quill requires a title. |
 | `/bookexport export [title]` | Uses the server's configured workflow; this normally stages on a current installation. |
@@ -127,6 +128,9 @@ plugin configuration. Those values are documented in the
   interactive component behavior.
 - Staff may request changes instead of publishing a draft. Revise the source book
   or follow the reviewer's instructions before staging a replacement.
+- If staff report that a named draft has an interrupted publication under recovery
+  review, do not restage or retry it. BookExport preserves the uncertain transaction
+  for administrators to reconcile without exposing the book text.
 
 ## Related Features
 

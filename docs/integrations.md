@@ -9,24 +9,24 @@ do not control whether BookExport loads.
 
 | Component | Relationship | Verified target or tested version |
 | --- | --- | --- |
-| Paper | Required server and production API | Paper 26.2; compile API `26.2.build.60-beta` |
-| Java | Required runtime and bytecode target | Java 25 or newer runtime; Java 25 class files |
+| Paper | Required server and production API | Paper 26.2 `STABLE` build 84; compile API `26.2.build.84-stable` |
+| Java | Required runtime and bytecode target | Java 25 class files; Oracle Java 25.0.4 and 26.0.2 smoke-tested |
 | CMI | Optional consumer of published CustomText files | CMI 9.8.8.5 tested |
 | CMILib | CMI's dependency, not BookExport's dependency | CMILib 1.5.9.9 tested alongside CMI |
 | PlaceholderAPI | Optional resolver used by CMI or other display plugins; no BookExport expansion | PlaceholderAPI 2.12.3 tested alongside CMI |
 | LuckPerms | Optional Bukkit permission provider | LuckPerms 5.5.59 tested |
 | Vault | No BookExport relationship | The tested server's CMI-flavored Vault artifact reported manifest version `1.7.3-CMI`; BookExport did not use it |
 
-The optional-plugin versions above describe the stack exercised on 2026-07-14.
+The optional-plugin versions above describe the stack exercised on 2026-07-28.
 They are not declared minimum dependencies and are not bundled into the BookExport
 JAR.
 
 ## Paper and Adventure text
 
-Paper 26.2 supplies the server API and Adventure component types used to read modern
-written-book pages and send chat components. BookExport targets Java 25 class files
-and `api-version: 26.2`; Spigot and earlier Paper/Minecraft versions are not
-supported.
+Paper 26.2 stable build 84 supplies the server API and Adventure component types
+used to read modern written-book pages and send chat components. BookExport targets
+Java 25 class files, compiles against `26.2.build.84-stable`, and declares
+`api-version: 26.2`; Spigot and earlier Paper/Minecraft versions are not supported.
 
 The Paper-aligned Adventure API listed in the Gradle test configuration supports
 unit tests. BookExport does not bundle a separate Adventure runtime JAR.
@@ -52,6 +52,12 @@ and then test the entry:
 /cmi reload
 /cmi ctext <name> <player>
 ```
+
+Crash-journal scanning and `/bookexport admin recovery list|show` never invoke CMI,
+run a command, or reload a plugin. If a transaction stopped after its live move,
+CMI's in-memory view may therefore remain older than the file on disk. Preserve the
+reported files, reconcile the checksums manually, and reload CMI only after an
+administrator has deliberately resolved the publication state.
 
 Without CMI, BookExport can still stage, review, archive, back up, and write text
 files. The default published directory may be created even when CMI is absent, but

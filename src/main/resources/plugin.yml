@@ -10,7 +10,7 @@ commands:
   bookexport:
     aliases: [bexport]
     description: Stage or export the held book, or inspect and administer BookExport.
-    usage: /bookexport [export|stage|info|help|list|reload|debug|admin <status|list|review|approve|changes|publish|history|reload|debug>]
+    usage: /bookexport [export|stage|info|version|status|help|list|reload|debug|admin <status|list|review|approve|changes|publish|history|recovery|reload|debug>]
 
 permissions:
   bookexport.admin:
@@ -30,6 +30,7 @@ permissions:
       bookexport.admin.approve: true
       bookexport.admin.publish: true
       bookexport.admin.history: true
+      bookexport.admin.recovery: true
       bookexport.admin.reload: true
       bookexport.admin.debug: true
 
@@ -87,6 +88,10 @@ permissions:
 
   bookexport.admin.history:
     description: Allows viewing manifest-backed publication history and audit metadata.
+    default: op
+
+  bookexport.admin.recovery:
+    description: Allows read-only inspection of incomplete publication transactions and checksums.
     default: op
 
   bookexport.admin.reload:

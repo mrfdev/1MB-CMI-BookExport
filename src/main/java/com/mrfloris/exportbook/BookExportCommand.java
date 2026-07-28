@@ -17,6 +17,19 @@ import java.util.UUID;
 
 /** Permission-aware command router for player, console, admin, and debug operations. */
 final class BookExportCommand implements TabExecutor {
+    enum RootRoute {
+        EXPORT,
+        STAGE,
+        INFO,
+        STATUS,
+        HELP,
+        ADMIN,
+        DEBUG,
+        LIST,
+        RELOAD,
+        LEGACY_TITLE
+    }
+
     private static final String EXPORT = "bookexport.export";
     private static final String CUSTOM_TITLE = "bookexport.export.custom-title";
     private static final String INFO = "bookexport.info";
@@ -31,6 +44,7 @@ final class BookExportCommand implements TabExecutor {
     private static final String PUBLISH = "bookexport.admin.publish";
     private static final String REPLACE = "bookexport.admin.replace";
     private static final String HISTORY = "bookexport.admin.history";
+    private static final String RECOVERY = "bookexport.admin.recovery";
     private static final String RELOAD = "bookexport.admin.reload";
     private static final String DEBUG = "bookexport.admin.debug";
 
@@ -49,22 +63,40 @@ final class BookExportCommand implements TabExecutor {
         }
 
         String subcommand = args[0].toLowerCase(Locale.ROOT);
-        return switch (subcommand) {
-            case "export" -> export(sender, join(args, 1), false);
-            case "stage" -> export(sender, join(args, 1), true);
-            case "info" -> args.length == 1
+        return switch (rootRoute(subcommand)) {
+            case EXPORT -> export(sender, join(args, 1), false);
+            case STAGE -> export(sender, join(args, 1), true);
+            case INFO -> args.length == 1
                     ? showInfo(sender)
-                    : usageError(sender, "Usage: /bookexport info");
-            case "help", "?" -> args.length == 1
+                    : usageError(sender, "Usage: /bookexport " + subcommand);
+            case STATUS -> args.length == 1
+                    ? showAdminStatus(sender)
+                    : usageError(sender, "Usage: /bookexport status");
+            case HELP -> args.length == 1
                     ? showHelp(sender)
                     : usageError(sender, "Usage: /bookexport help");
-            case "admin" -> admin(sender, args);
-            case "debug" -> debug(sender, args, 1);
-            case "list" -> list(sender, args, 1);
-            case "reload" -> args.length == 1
+            case ADMIN -> admin(sender, args);
+            case DEBUG -> debug(sender, args, 1);
+            case LIST -> list(sender, args, 1);
+            case RELOAD -> args.length == 1
                     ? reload(sender)
                     : usageError(sender, "Usage: /bookexport reload");
-            default -> export(sender, String.join(" ", args), false); // Legacy /bookexport <title>
+            case LEGACY_TITLE -> export(sender, String.join(" ", args), false);
+        };
+    }
+
+    static RootRoute rootRoute(String subcommand) {
+        return switch (subcommand.toLowerCase(Locale.ROOT)) {
+            case "export" -> RootRoute.EXPORT;
+            case "stage" -> RootRoute.STAGE;
+            case "info", "version" -> RootRoute.INFO;
+            case "status" -> RootRoute.STATUS;
+            case "help", "?" -> RootRoute.HELP;
+            case "admin" -> RootRoute.ADMIN;
+            case "debug" -> RootRoute.DEBUG;
+            case "list" -> RootRoute.LIST;
+            case "reload" -> RootRoute.RELOAD;
+            default -> RootRoute.LEGACY_TITLE;
         };
     }
 
@@ -138,6 +170,9 @@ final class BookExportCommand implements TabExecutor {
                 build.version(),
                 build.buildNumber(),
                 build.paperTarget(),
+                build.paperApiVersion(),
+                build.paperBuild(),
+                build.paperChannel(),
                 build.javaTarget(),
                 plugin.settings().workflowMode().key(),
                 plugin.getServer().getVersion(),
@@ -169,7 +204,11 @@ final class BookExportCommand implements TabExecutor {
             sender.sendMessage(Messages.command("/bookexport stage [title]", "always create a staged draft"));
         }
         if (sender.hasPermission(INFO)) {
-            sender.sendMessage(Messages.command("/bookexport info", "show version and compatibility"));
+            sender.sendMessage(Messages.command(
+                    "/bookexport info",
+                    "show generated version, build, and compatibility metadata"
+            ));
+            sender.sendMessage(Messages.command("/bookexport version", "alias for plugin information"));
         }
         sender.sendMessage(Messages.command("/bookexport help", "show permission-filtered help"));
         showListHelp(sender);
@@ -205,8 +244,15 @@ final class BookExportCommand implements TabExecutor {
                     "show one stable manifest record"
             ));
         }
+        if (sender.hasPermission(RECOVERY)) {
+            sender.sendMessage(Messages.command(
+                    "/bookexport admin recovery [list [page]|show <transaction-id>]",
+                    "inspect interrupted publication state without changing files"
+            ));
+        }
         if (sender.hasPermission(STATUS)) {
             sender.sendMessage(Messages.command("/bookexport admin", "show workflow and directory status"));
+            sender.sendMessage(Messages.command("/bookexport status", "alias for admin status"));
         }
         if (sender.hasPermission(RELOAD)) {
             sender.sendMessage(Messages.command("/bookexport reload", "reload and validate config.yml"));
@@ -251,6 +297,7 @@ final class BookExportCommand implements TabExecutor {
             case "changes" -> requestChanges(sender, args);
             case "publish" -> publish(sender, args);
             case "history" -> history(sender, args);
+            case "recovery" -> recovery(sender, args);
             case "reload" -> args.length == 2
                     ? reload(sender)
                     : usageError(sender, "Usage: /bookexport admin reload");
@@ -258,7 +305,7 @@ final class BookExportCommand implements TabExecutor {
             default -> {
                 sender.sendMessage(Messages.error(
                         "Usage: /bookexport admin "
-                                + "[status|list|review|approve|changes|publish|history|reload|debug]"
+                                + "[status|list|review|approve|changes|publish|history|recovery|reload|debug]"
                 ));
                 yield true;
             }
@@ -273,6 +320,14 @@ final class BookExportCommand implements TabExecutor {
         sender.sendMessage(Messages.header("BookExport admin status"));
         sender.sendMessage(Messages.info("Version", plugin.buildInfo().version()));
         sender.sendMessage(Messages.info("Build", plugin.buildInfo().buildNumber()));
+        sender.sendMessage(Messages.info("Artifact", plugin.buildInfo().artifactFileName()));
+        sender.sendMessage(Messages.info("Java target", plugin.buildInfo().javaTarget()));
+        sender.sendMessage(Messages.info(
+                "Paper target",
+                plugin.buildInfo().paperTarget() + ' ' + plugin.buildInfo().paperChannel().toLowerCase(Locale.ROOT)
+                        + " build " + plugin.buildInfo().paperBuild()
+        ));
+        sender.sendMessage(Messages.info("Paper API", plugin.buildInfo().paperApiVersion()));
         sender.sendMessage(Messages.info("Config", settings.configVersion()
                 + (settings.directCompatibilityMode() ? " (direct compatibility mode)" : " (current)")));
         sender.sendMessage(Messages.info("Workflow mode", settings.workflowMode().key()));
@@ -281,7 +336,9 @@ final class BookExportCommand implements TabExecutor {
         showScopeStatus(sender, FileScope.PUBLISHED);
         showScopeStatus(sender, FileScope.ARCHIVE);
         showScopeStatus(sender, FileScope.BACKUPS);
+        showTransactionDirectoryStatus(sender);
         showManifestHealth(sender);
+        showRecoveryHealth(sender);
         sender.sendMessage(Messages.info("Output profile", settings.colorMode().name().toLowerCase(Locale.ROOT)));
         sender.sendMessage(Messages.info("Pagination", settings.pagination()
                 ? settings.paginationMarkup() + " (first-page=" + settings.paginationOnFirstPage() + ')'
@@ -305,6 +362,17 @@ final class BookExportCommand implements TabExecutor {
         }
         sender.sendMessage(Messages.info(capitalize(scope.key()), directory + " (" + health + ", " + count
                 + " .txt file(s))"));
+    }
+
+    private void showTransactionDirectoryStatus(CommandSender sender) {
+        Path directory = plugin.settings().transactionDirectory();
+        String health = Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS) && Files.isWritable(directory)
+                ? "writable" : "not writable";
+        int records = exporter.recoveryReport().entries().size();
+        sender.sendMessage(Messages.info(
+                "Transactions",
+                directory + " (" + health + ", " + records + " journal record(s))"
+        ));
     }
 
     private void showManifestHealth(CommandSender sender) {
@@ -332,6 +400,22 @@ final class BookExportCommand implements TabExecutor {
         } catch (BookExportException exception) {
             sender.sendMessage(Messages.warning("Manifest health is unavailable: " + exception.getMessage()));
         }
+    }
+
+    private void showRecoveryHealth(CommandSender sender) {
+        PublicationRecoveryReport report = exporter.recoveryReport();
+        if (report.entries().isEmpty()) {
+            sender.sendMessage(Messages.info("Recovery journal", "clear"));
+            return;
+        }
+        sender.sendMessage(Messages.info(
+                "Recovery journal",
+                report.entries().size() + " record(s): "
+                        + report.infoCount() + " info, "
+                        + report.warningCount() + " warning, "
+                        + report.criticalCount() + " critical; publication "
+                        + (report.hasGlobalBlocker() ? "globally blocked" : "scoped blocking active")
+        ));
     }
 
     private void showAdminShortcuts(CommandSender sender) {
@@ -363,6 +447,12 @@ final class BookExportCommand implements TabExecutor {
             sender.sendMessage(Messages.command(
                     "/bookexport admin history",
                     "browse content-free review and publication records"
+            ));
+        }
+        if (sender.hasPermission(RECOVERY)) {
+            sender.sendMessage(Messages.command(
+                    "/bookexport admin recovery",
+                    "inspect the read-only publication recovery journal"
             ));
         }
         if (sender.hasPermission(RELOAD)) {
@@ -553,6 +643,124 @@ final class BookExportCommand implements TabExecutor {
             sender.sendMessage(Messages.error(exception.getMessage()));
         }
         return true;
+    }
+
+    private boolean recovery(CommandSender sender, String[] args) {
+        if (!require(sender, RECOVERY, "inspect publication recovery metadata")) {
+            return true;
+        }
+        RecoveryCommandRequest request;
+        try {
+            request = RecoveryCommandRequest.parse(args, 2);
+        } catch (IllegalArgumentException exception) {
+            sender.sendMessage(Messages.error(exception.getMessage()));
+            return true;
+        }
+
+        PublicationRecoveryReport report = exporter.recoveryReport();
+        if (request.isShow()) {
+            PublicationRecoveryEntry entry = report.find(request.transactionId()).orElse(null);
+            if (entry == null) {
+                sender.sendMessage(Messages.error(
+                        "No unique recovery journal uses transaction ID " + request.transactionId() + '.'
+                ));
+                return true;
+            }
+            showRecoveryEntry(sender, entry);
+            return true;
+        }
+
+        if (report.entries().isEmpty()) {
+            sender.sendMessage(Messages.info("Recovery journal", "clear; no transaction records found"));
+            return true;
+        }
+        ListPage page = ListPage.calculate(
+                report.entries().size(),
+                request.page(),
+                plugin.settings().listPageSize()
+        );
+        sender.sendMessage(Messages.header(
+                "BookExport publication recovery (page " + page.page() + '/' + page.pageCount() + ')'
+        ));
+        for (PublicationRecoveryEntry entry : report.entries().subList(page.fromIndex(), page.toIndex())) {
+            sender.sendMessage(Messages.recoveryEntry(entry));
+        }
+        if (page.pageCount() > 1) {
+            sender.sendMessage(Messages.recoveryNavigation(page));
+        }
+        sender.sendMessage(Messages.warning(
+                "Read-only report: no recovery, retry, rollback, deletion, publication, or CMI reload was attempted."
+        ));
+        return true;
+    }
+
+    private void showRecoveryEntry(CommandSender sender, PublicationRecoveryEntry entry) {
+        sender.sendMessage(Messages.header("BookExport publication recovery detail"));
+        UUID transactionId = entry.transactionId();
+        if (transactionId != null) {
+            sender.sendMessage(Messages.copyableInfo("Transaction ID", transactionId.toString()));
+        }
+        sender.sendMessage(Messages.info("Assessment", recoveryKey(entry.assessment())));
+        sender.sendMessage(Messages.info("Severity", entry.severity().name().toLowerCase(Locale.ROOT)));
+        if (!entry.metadataAvailable()) {
+            sender.sendMessage(Messages.warning(
+                    "Journal metadata is unreadable or ambiguous; preserve all related files for manual review."
+            ));
+            sender.sendMessage(Messages.warning(
+                    "No files were changed. Do not retry publication until this transaction is reconciled."
+            ));
+            return;
+        }
+
+        PublicationTransaction transaction = entry.transaction();
+        sender.sendMessage(Messages.info("Journal state", transaction.state().key()));
+        sender.sendMessage(Messages.info("Journal revision", Long.toString(transaction.revision())));
+        sender.sendMessage(Messages.info("Created UTC", transaction.createdAt().toString()));
+        sender.sendMessage(Messages.info("Updated UTC", transaction.updatedAt().toString()));
+        sender.sendMessage(Messages.copyableInfo("Draft ID", transaction.draftId().toString()));
+        sender.sendMessage(Messages.info(
+                "Approved manifest revision",
+                Long.toString(transaction.approvedManifestRevision())
+        ));
+        sender.sendMessage(Messages.info("Publisher", formatActor(transaction.publisher())));
+        sender.sendMessage(Messages.info("Collision mode", transaction.collisionMode().key()));
+        sender.sendMessage(Messages.info("Intended filename", transaction.intendedFilename()));
+        sender.sendMessage(Messages.info("Staged filename", transaction.stagedFilename()));
+        sender.sendMessage(Messages.info("Published filename", transaction.publishedFilename()));
+        sender.sendMessage(Messages.info("Archive filename", transaction.archiveFilename()));
+        sender.sendMessage(Messages.info(
+                "Backup filename",
+                transaction.backupFilename() == null ? "none" : transaction.backupFilename()
+        ));
+        sender.sendMessage(Messages.info(
+                "Approved UTF-8 bytes",
+                Long.toString(transaction.approvedFingerprint().utf8Bytes())
+        ));
+        sender.sendMessage(Messages.copyableInfo(
+                "Approved SHA-256",
+                transaction.approvedFingerprint().sha256()
+        ));
+        if (transaction.replacedFingerprint() != null) {
+            sender.sendMessage(Messages.info(
+                    "Replaced UTF-8 bytes",
+                    Long.toString(transaction.replacedFingerprint().utf8Bytes())
+            ));
+            sender.sendMessage(Messages.copyableInfo(
+                    "Replaced SHA-256",
+                    transaction.replacedFingerprint().sha256()
+            ));
+        }
+        sender.sendMessage(Messages.info("Staged artifact", observationKey(entry.stagedArtifact())));
+        sender.sendMessage(Messages.info("Published artifact", observationKey(entry.publishedArtifact())));
+        sender.sendMessage(Messages.info("Archive artifact", observationKey(entry.archiveArtifact())));
+        sender.sendMessage(Messages.info("Backup artifact", observationKey(entry.backupArtifact())));
+        sender.sendMessage(Messages.info(
+                "Manifest observation",
+                recoveryKey(entry.manifestObservation())
+        ));
+        sender.sendMessage(Messages.warning(
+                "No files were changed. Do not retry publication until this transaction is reconciled."
+        ));
     }
 
     private void showDraftReview(CommandSender sender, DraftReview review) {
@@ -831,6 +1039,11 @@ final class BookExportCommand implements TabExecutor {
                 + " (target " + build.javaTarget() + ')'));
         sender.sendMessage(Messages.info("JVM", System.getProperty("java.vm.name")));
         sender.sendMessage(Messages.info("Paper API", build.paperApiVersion()));
+        sender.sendMessage(Messages.info(
+                "Paper release target",
+                build.paperTarget() + ' ' + build.paperChannel().toLowerCase(Locale.ROOT)
+                        + " build " + build.paperBuild() + " (" + build.paperServerJarFileName() + ')'
+        ));
         sender.sendMessage(Messages.info("Server", plugin.getServer().getVersion()));
         sender.sendMessage(Messages.info("Workflow", plugin.settings().workflowMode().key()));
         sender.sendMessage(Messages.info("Published directory writable",
@@ -890,7 +1103,9 @@ final class BookExportCommand implements TabExecutor {
         for (FileScope scope : FileScope.values()) {
             showScopeStatus(sender, scope);
         }
+        showTransactionDirectoryStatus(sender);
         showManifestHealth(sender);
+        showRecoveryHealth(sender);
         sender.sendMessage(Messages.info("Last failure", plugin.lastFailure()));
         return true;
     }
@@ -973,6 +1188,14 @@ final class BookExportCommand implements TabExecutor {
         return integrity.name().toLowerCase(Locale.ROOT).replace('_', '-');
     }
 
+    private static String observationKey(ArtifactObservation observation) {
+        return recoveryKey(observation);
+    }
+
+    private static String recoveryKey(Enum<?> value) {
+        return value.name().toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
     private static String shortChecksum(String checksum) {
         return checksum.substring(0, Math.min(12, checksum.length())) + '…';
     }
@@ -1001,7 +1224,9 @@ final class BookExportCommand implements TabExecutor {
             addIfPermitted(options, sender, EXPORT, "export");
             addIfPermitted(options, sender, EXPORT, "stage");
             addIfPermitted(options, sender, INFO, "info");
+            addIfPermitted(options, sender, INFO, "version");
             addIfPermitted(options, sender, HELP, "help");
+            addIfPermitted(options, sender, STATUS, "status");
             if (hasAnyAdminPermission(sender)) {
                 options.add("admin");
             }
@@ -1023,6 +1248,7 @@ final class BookExportCommand implements TabExecutor {
             addIfPermitted(options, sender, APPROVE, "changes");
             addIfPermitted(options, sender, PUBLISH, "publish");
             addIfPermitted(options, sender, HISTORY, "history");
+            addIfPermitted(options, sender, RECOVERY, "recovery");
             addIfPermitted(options, sender, RELOAD, "reload");
             addIfPermitted(options, sender, DEBUG, "debug");
             return filter(options, args[1]);
@@ -1070,6 +1296,17 @@ final class BookExportCommand implements TabExecutor {
                 && sender.hasPermission(HISTORY)) {
             return filter(historyIdOptions(), args[3]);
         }
+        if (args.length == 3 && args[0].equalsIgnoreCase("admin")
+                && args[1].equalsIgnoreCase("recovery")
+                && sender.hasPermission(RECOVERY)) {
+            return filter(List.of("list", "show"), args[2]);
+        }
+        if (args.length == 4 && args[0].equalsIgnoreCase("admin")
+                && args[1].equalsIgnoreCase("recovery")
+                && args[2].equalsIgnoreCase("show")
+                && sender.hasPermission(RECOVERY)) {
+            return filter(recoveryIdOptions(), args[3]);
+        }
         if (args.length == 2 && args[0].equalsIgnoreCase("debug") && sender.hasPermission(DEBUG)) {
             return filter(debugOptions(), args[1]);
         }
@@ -1099,6 +1336,15 @@ final class BookExportCommand implements TabExecutor {
         }
     }
 
+    private List<String> recoveryIdOptions() {
+        return exporter.recoveryReport().entries().stream()
+                .map(PublicationRecoveryEntry::transactionId)
+                .filter(java.util.Objects::nonNull)
+                .map(UUID::toString)
+                .distinct()
+                .toList();
+    }
+
     private static List<String> debugOptions() {
         return List.of("runtime", "book", "cmi", "workflow", "preview");
     }
@@ -1123,6 +1369,7 @@ final class BookExportCommand implements TabExecutor {
                 || sender.hasPermission(APPROVE)
                 || sender.hasPermission(PUBLISH)
                 || sender.hasPermission(HISTORY)
+                || sender.hasPermission(RECOVERY)
                 || sender.hasPermission(RELOAD)
                 || sender.hasPermission(DEBUG);
     }
