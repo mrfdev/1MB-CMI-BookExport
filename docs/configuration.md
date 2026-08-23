@@ -112,6 +112,10 @@ before the first source page and is normally incorrect for CMI.
   `plugins/BookExport/`.
 - Staged publication accepts only a direct, regular, non-symbolic-link `.txt` file.
   Case-ambiguous filenames and manifest associations fail closed.
+- Direct and reviewed publication retain a fixed `.bookexport-publication.lock`
+  sentinel in the published directory. It is internal, contains no book content,
+  is not a CustomText `.txt` file, and must not be deleted or replaced while a
+  BookExport process may publish.
 
 An invalid path disables BookExport during startup. An invalid reload is rejected
 without replacing the previous validated runtime settings.

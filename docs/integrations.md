@@ -45,6 +45,15 @@ to CMI's `{#RRGGBB}` form, converts supported decorations and resets to ampersan
 codes, and inserts `<NextPage>` only between Minecraft pages. BookExport never
 executes a CMI command and never invokes a CMI API.
 
+BookExport also retains a zero-content `.bookexport-publication.lock` sentinel in
+this directory. It is not a `.txt` CustomText entry. BookExport takes a non-blocking
+exclusive lock on that sentinel during direct and reviewed publication so cooperating
+BookExport processes cannot write concurrently. Do not delete or replace it while a
+server may publish. Other editors must deliberately honor the same sentinel because
+operating-system file locks can be advisory. This defense-in-depth lock does not make
+sharing workflow roots between Paper installations supported; their recovery journals
+would remain separate.
+
 After publishing or directly exporting a new file, an administrator must reload CMI
 and then test the entry:
 

@@ -74,7 +74,7 @@ This document separates completed 2.0 modernization work from proposed follow-up
 
 - [ ] Optionally run a narrowly configured CMI refresh command after publish; keep it disabled by default.
 - [x] Add a durable transaction journal and read-only startup recovery report for a process or host crash between backup, publication, manifest update, archive, staged cleanup, and finalization steps.
-- [ ] Evaluate cross-process file locking or an explicit single-writer policy for destinations that external tools may edit concurrently.
+- [x] Add a non-blocking cooperative cross-process lock for direct and reviewed publication, while retaining the explicit single-owner policy for separate Paper installations and external tools that do not honor advisory locks.
 - [ ] Add a content-aware review report that flags CMI directives, interactive tags, and placeholder tokens without logging raw page content.
 - [ ] Consider an opt-in strict policy that requires explicit approval for every managed and legacy draft; keep the current non-blocking compatibility policy until deliberately configured.
 - [ ] Add `/bookexport admin discard <staged-file>` with a separate permission and confirmation-oriented UI.

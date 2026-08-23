@@ -109,7 +109,7 @@ final class BookExporter {
         Path path;
         DraftManifest manifest = null;
         try {
-            path = BookFileStore.writeUnique(
+            PublicationWriteLock.Operation<Path> writeOperation = () -> BookFileStore.writeUnique(
                     settings.exportDestination(forceStage),
                     preview.filenameBase(),
                     preview.content(),
@@ -117,6 +117,12 @@ final class BookExporter {
                     scope == FileScope.STAGED ? DraftManifestStore.MANIFEST_SUFFIX : null,
                     scope == FileScope.STAGED ? DraftManifestStore.CREATION_MARKER_SUFFIX : null
             );
+            path = scope == FileScope.PUBLISHED
+                    ? PublicationWriteLock.withExclusiveLock(
+                            settings.publishedDirectory(),
+                            writeOperation
+                    )
+                    : writeOperation.run();
             if (scope == FileScope.STAGED) {
                 try {
                     DraftReview review = manifestStore.createNative(

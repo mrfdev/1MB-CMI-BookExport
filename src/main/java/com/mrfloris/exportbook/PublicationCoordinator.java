@@ -6,7 +6,7 @@ import java.time.Clock;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Coordinates the durable reviewed-publication protocol as one in-process writer. */
+/** Coordinates the durable reviewed-publication protocol as one cooperative writer. */
 final class PublicationCoordinator {
     private final Clock clock;
     private final DraftManifestStore manifestStore;
@@ -42,6 +42,27 @@ final class PublicationCoordinator {
         Objects.requireNonNull(settings, "settings");
         Objects.requireNonNull(collisionMode, "collisionMode");
         Objects.requireNonNull(publisher, "publisher");
+
+        try {
+            return PublicationWriteLock.withExclusiveLock(
+                    settings.publishedDirectory(),
+                    () -> publishWhileLocked(settings, stagedFilename, collisionMode, publisher)
+            );
+        } catch (IOException exception) {
+            throw new BookExportException(
+                    "Unable to establish the cross-process publication lock; no publication "
+                            + "transaction was started and no live file was changed.",
+                    exception
+            );
+        }
+    }
+
+    private PublishResult publishWhileLocked(
+            ExportSettings settings,
+            String stagedFilename,
+            PublishCollisionMode collisionMode,
+            DraftManifest.Actor publisher
+    ) throws BookExportException {
 
         Path stagedPath = resolveStaged(settings, stagedFilename);
         DraftReview approved = verifyApproved(stagedPath, publisher);

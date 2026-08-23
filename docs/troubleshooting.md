@@ -131,6 +131,21 @@ draft is retained. Review the `.txt` again, run
 `/bookexport admin review <file>`, and then approve the current bytes with
 `/bookexport admin approve <file>` or restore the previously reviewed content.
 
+### Publication says another BookExport writer is using the destination
+
+Direct and reviewed publication use an immediate, non-blocking lock on
+`.bookexport-publication.lock` in the published directory. Wait for the active
+publication in the same installation to finish and retry once. If a second Paper
+process or BookExport installation uses the destination, stop the duplicate cleanly
+instead of retrying: sharing workflow roots is unsupported because each installation
+has a separate recovery journal. A clean process exit releases the operating-system
+lock; do not delete or replace the sentinel to bypass an active writer.
+
+The protocol coordinates BookExport processes and external tools that deliberately
+honor the sentinel. It cannot prevent an arbitrary editor from ignoring an advisory
+lock, so keep non-cooperating writers out of the workflow directories during
+publication.
+
 ### A staged row says changes requested
 
 A reviewer used `/bookexport admin changes <file>`. Edit and inspect the draft, then
@@ -341,9 +356,11 @@ expansion can leave a token visible.
 - Staged publication uses a durable, content-free transaction journal and read-only
   checksum reconciliation. It is not an automatic recovery, rollback, retry, or
   cleanup system. Direct workflow exports do not create publication journals.
-- In-process storage operations are synchronized, but BookExport does not provide a
-  cross-process filesystem lock. Do not point multiple Paper processes or external
-  writers at the same workflow directories.
+- Direct and reviewed publication use a cooperative cross-process lock in the
+  published directory. It prevents overlapping cooperative writes but does not make
+  shared workflows supported and cannot stop a tool that ignores advisory locks;
+  keep one BookExport installation as the workflow owner and keep other writers out
+  during publication.
 - BookExport has no automatic archive/backup retention, prune command, or rollback
   command.
 - BookExport never reloads CMI automatically.

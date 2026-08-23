@@ -67,6 +67,7 @@ Typical uses include:
 - Detects managed drafts changed after staging or approval and blocks unsafe publication until their manifest is reviewed and approved again.
 - Attempts an atomic manifest checkpoint immediately after each committed live publication and before archival; a stored pending record blocks repeat publication, and an archival failure retains the draft.
 - Plans exact live, archive, and optional backup filenames, then stores a durable content-free transaction before any backup or live mutation.
+- Uses a non-blocking cooperative lock for direct and reviewed publication so another BookExport writer cannot mutate the same published destination concurrently.
 - Reconciles interrupted transactions by checksum at startup and through read-only recovery list/show commands; it never automatically retries, rolls back, deletes, republishes, finalizes, cleans up, or reloads CMI.
 - Preserves page order and page boundaries without reflowing or truncating valid book content.
 - Produces correct CMI pagination: controlled `<AutoPage>` first line and `<NextPage>` only between pages.
@@ -373,6 +374,24 @@ The optional command mode overrides the configured `publish-collision-mode` for 
 | `unique` | Publish as `_1`, `_2`, and so on | Publish with the staged filename |
 | `replace` / `replace-with-backup` | Copy the current published file to `backup-directory`, then atomically replace it | Stop and retain the staged draft; use `fail` or `unique` for a new file |
 
+Before a direct export or reviewed publication begins, BookExport takes an exclusive,
+non-blocking operating-system lock on the fixed
+`.bookexport-publication.lock` sentinel in the published directory. Another
+BookExport writer using that destination fails immediately; a reviewed publication
+fails before it creates a journal or changes a live file. The zero-content sentinel
+is deliberately retained between operations because deleting and recreating its
+pathname could let two processes lock different filesystem objects. Do not delete,
+replace, or edit it while a server may publish.
+
+The lock is a cooperative protocol, not a filesystem sandbox. Java file locks are
+advisory on some platforms, so an editor or other process that ignores the sentinel
+can still change files. Keep such tools out of the workflow directories during
+publication or make them honor the same sentinel. BookExport's exact-target and
+checksum revalidation remains fail-closed for detected non-cooperating changes. The
+lock also does not make sharing workflow roots between Paper installations supported:
+each installation has its own recovery journal, so one installation must remain the
+single owner of a workflow.
+
 Publication first selects exact live, UUID-bearing archive, and optional UUID-bearing backup filenames. It stores that plan atomically as `plugins/BookExport/transactions/<transaction-uuid>.bookexport-transaction.properties` before any backup or live mutation. The journal contains only IDs, revisions/states, timestamps, publisher identity, collision mode, basename-only filenames, byte counts, SHA-256 values, and a checksum of the workflow roots—never book pages or rendered CustomText.
 
 The durable protocol advances through these states:
@@ -391,7 +410,7 @@ Every file mutation is followed by its journal update. File contents and directo
 
 The scanner reports one of nine explicit assessments: `abandoned-before-live-commit`, `backup-created-no-live-commit`, `live-commit-needs-checkpoint`, `checkpoint-needs-archive`, `archive-needs-source-cleanup`, `archive-needs-manifest-finalize`, `completed-journal-remains`, `conflict-requires-manual-review`, or `unreadable-requires-manual-review`. Detail output also reports whether each named artifact is missing, matches the reviewed checksum, matches the pre-replacement checksum, mismatches, is ambiguous, is unreadable, or is not applicable.
 
-Recovery inspection is intentionally passive and idempotent. BookExport never automatically replays, repairs, retries, republishes, rolls back, restores, deletes, completes archival, promotes a manifest, cleans a journal, or reloads CMI. Preserve the files and use the [troubleshooting procedure](docs/troubleshooting.md#manual-reconciliation-procedure) for manual review. This journal protects reviewed staged `/bookexport admin publish`; direct compatibility-mode exports do not create manifests, archives, backups, or transaction journals. The remaining cross-process locking limitation is tracked separately in the backlog.
+Recovery inspection is intentionally passive and idempotent. BookExport never automatically replays, repairs, retries, republishes, rolls back, restores, deletes, completes archival, promotes a manifest, cleans a journal, or reloads CMI. Preserve the files and use the [troubleshooting procedure](docs/troubleshooting.md#manual-reconciliation-procedure) for manual review. This journal protects reviewed staged `/bookexport admin publish`; direct compatibility-mode exports use the cooperative publication lock but do not create manifests, archives, backups, or transaction journals.
 
 BookExport deliberately does not execute `/cmi reload`; an administrator remains responsible for reviewing the published file and refreshing CMI.
 
