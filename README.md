@@ -16,9 +16,9 @@ Canonical player documentation: [docs.1moreblock.com/custom-server-plugins/booke
 | Compile API | `io.papermc.paper:paper-api:26.2.build.84-stable` |
 | Server release | Paper 26.2 STABLE build 84 (`Paper-26.2.jar`) |
 | Java bytecode | Java 25 |
-| Tested runtimes | Oracle Java 25.0.4 and 26.0.2 |
+| Tested runtimes | Oracle Java 25.0.4.1 and 26.0.2.1 |
 | Build tool | Gradle 9.4.1 wrapper |
-| BookExport | `2.0.2` (release build `019`) |
+| BookExport | `2.0.2` (release build `020`) |
 
 Older Minecraft, Paper, Spigot, and Java releases are intentionally unsupported.
 
@@ -86,14 +86,14 @@ Typical uses include:
 
 Paper is the only production/plugin API dependency. JUnit and the Paper-aligned Adventure API are used only by the test suite and are not bundled. BookExport does not call the APIs of CMI, CMILib, PlaceholderAPI, Vault, or LuckPerms.
 
-The current test-server versions, reverified on 2026-07-28, are:
+The current test-server versions, reverified on 2026-09-15, are:
 
 | Plugin | Tested version | Relationship to BookExport |
 | --- | --- | --- |
-| CMI | 9.8.8.5 | Optional consumer of published CustomText files |
+| CMI | 9.8.9.9 | Optional consumer of published CustomText files |
 | CMILib | 1.5.9.9 | CMI's dependency, not BookExport's dependency |
 | PlaceholderAPI | 2.12.3 | Optional; CMI can resolve preserved tokens at display time |
-| LuckPerms | 5.5.59 | Optional Bukkit permission provider |
+| LuckPerms | 5.5.81 | Optional Bukkit permission provider |
 | Vault CMI build | Manifest version 1.7.3-CMI | Unrelated to BookExport |
 
 Do not add these plugins to BookExport's Gradle dependencies unless BookExport later begins calling their APIs.
@@ -103,14 +103,16 @@ Do not add these plugins to BookExport's Gradle dependencies unless BookExport l
 1. Build the plugin:
 
    ```bash
-   ./gradlew clean build
+   export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-25.0.4.1.jdk/Contents/Home
+   export PATH="$JAVA_HOME/bin:$PATH"
+   ./gradlew clean build --warning-mode all
    ```
 
-2. Copy `build/libs/1MB-BookExport-v2.0.2-019-j25-26.2.jar` to the Paper 26.2 server's `plugins/` directory.
+2. Copy `build/libs/1MB-BookExport-v2.0.2-020-j25-26.2.jar` to the Paper 26.2 server's `plugins/` directory.
 3. Remove any older BookExport JAR so Paper does not discover two copies.
 4. Restart Paper cleanly. Do not use Bukkit `/reload` or a hot-reload plugin.
 5. Confirm `/version BookExport` reports `2.0.2`.
-6. Confirm `/bookexport info` or `/bookexport version` reports build `019`, the exact stable API, and opens the canonical player documentation.
+6. Confirm `/bookexport info` or `/bookexport version` reports build `020`, the exact stable API, and opens the canonical player documentation.
 7. Run `/bookexport admin status` and verify config version 3, workflow `staged`, five writable workflow/transaction directories, collision mode `fail`, and a clear recovery journal.
 
 If the server already has a version 2 `config.yml`, BookExport intentionally starts in direct compatibility mode. It does not rewrite the config or move existing files. Follow [Migrating a version 2 configuration](#migrating-a-version-2-configuration) when ready to enable staged-by-default exports.
@@ -504,7 +506,7 @@ BookExport therefore:
 | `list-page-size` | `10` | Filenames shown per list page, clamped to 1-50 |
 | `debug-logging` | `false` | Add content-free stage/direct-export statistics; review and publication audit metadata is logged independently |
 
-Build 019 keeps `config-version: 3` and adds no journal, manifest, or approval configuration keys. Managed sidecars and the fixed internal transaction directory are automatic, and explicit approval remains recommended rather than globally required so unchanged `unreviewed` and legacy drafts keep their compatible publication behavior.
+Build 020 keeps `config-version: 3` and adds no journal, manifest, or approval configuration keys. Managed sidecars and the fixed internal transaction directory are automatic, and explicit approval remains recommended rather than globally required so unchanged `unreviewed` and legacy drafts keep their compatible publication behavior.
 
 ### Path resolution and validation
 
@@ -590,8 +592,23 @@ Hex input is validated before conversion. Malformed sequences are treated as tex
 Run the complete verification suite:
 
 ```bash
+export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-25.0.4.1.jdk/Contents/Home
+export PATH="$JAVA_HOME/bin:$PATH"
 ./gradlew clean build --warning-mode all
 ```
+
+Run the same complete test suite with the installed Java 26 runtime while keeping
+the compiler and Gradle on JDK 25.0.4.1:
+
+```bash
+export JAVA26_HOME=/Library/Java/JavaVirtualMachines/jdk-26.0.2.1.jdk/Contents/Home
+./gradlew testJava26 --warning-mode all
+```
+
+`JAVA_HOME` and `PATH` select the build JDK; `JAVA26_HOME` selects the compatibility
+test JDK. Gradle reads both environment variables and does not download a JDK.
+On other machines, supply the equivalent installed JDK paths. Live runs Java 26;
+the plugin remains compiled with `--release 25` for both runtimes.
 
 The build:
 
@@ -608,27 +625,32 @@ The main artifact uses this naming scheme:
 1MB-BookExport-v<version>-<build>-j<java>-<minecraft>.jar
 ```
 
-Build `019` is the next monotonic BookExport release build. Release build numbers are intentionally independent of Git commit counts so an uncommitted release candidate does not need an artificial commit sequence.
+Build `020` is the current monotonic BookExport release build. Release build numbers are intentionally independent of Git commit counts so an uncommitted release candidate does not need an artificial commit sequence.
 
-### Build 019 verification snapshot
+### Build 020 verification snapshot
 
-The release candidate was verified on 2026-07-28 before publication:
+Release verified on 2026-09-15 with Oracle JDK 25.0.4.1
+(`25.0.4.1+1-LTS-5`) and compatibility tests on Oracle JDK 26.0.2.1
+(`26.0.2.1+1-7`). Both test suites ran 253 tests: 251 passed, zero failures/errors,
+and two expected case-variant skips on case-insensitive APFS. All 76 plugin
+classes have major version 69, minor version 0 (Java 25, no preview features).
+`./gradlew clean build --warning-mode all` and `./gradlew testJava26 --warning-mode all`
+passed. Both runtimes passed Paper startup, plugin loading, metadata/status/help,
+review/approval, all publication collision modes, exact-byte archive/backup checks,
+configuration reload, restart without workflow file changes, and clean shutdown.
 
-- `./gradlew clean build --warning-mode all` completed on JDK 25.0.4 with 253 tests: 251 passed, zero failures/errors, and two expected case-variant skips on case-insensitive APFS. It uses `--release 25`, treats compiler warnings as errors, and verifies generated resources, the JAR manifest, Java class version, all three release JARs, artifact names, and release metadata across every maintained documentation page.
-- The main plugin class is Java class-file major version 69, and the packaged descriptor declares BookExport 2.0.2 with `api-version: 26.2`.
-- Paper 26.2 STABLE build 84 is installed as `Paper-26.2.jar`; PaperScript verifies its saved and installed SHA-256 as `defe82c1c89067186895de34cf32983e9f5a2ea387cfe7597c020faebb98ca16`.
-- Build 019 is smoke-tested through clean startup, metadata/status/recovery commands, and shutdown on Oracle Java 25.0.4 and 26.0.2 with CMI 9.8.8.5, CMILib 1.5.9.9, LuckPerms 5.5.59, and PlaceholderAPI 2.12.3.
-- Neither smoke test emitted a BookExport warning, error, exception, or deprecated-API message. JVM startup did report Paper-bundled JOML's terminally deprecated `sun.misc.Unsafe::objectFieldOffset` use on both runtimes; Java 26 additionally reported LuckPerms-bundled Commodore final-field mutation. These third-party warnings did not originate in BookExport.
-- `/bookexport version` is an exact information alias and `/bookexport status` is an exact admin-status alias; neither can fall through to the legacy custom-title export route.
-- The automated suite adds 44 reachable collision-mode/crash-boundary scenarios, three complete publication modes, strict transaction codec/store durability, checksum reconciliation, restart-idempotent zero-write scans, scoped/global blocking, malformed-journal handling, direct-mode isolation, and sentinel privacy. Earlier manifest, renderer, filename, command, and Paper/CMI integration coverage remains in place.
+No BookExport warning, error, exception, or deprecated-API message was emitted.
+Third-party warnings covered Paper's JOML Unsafe usage, OSHI's macOS version
+recognition, and LuckPerms' Commodore final-field mutation on Java 26.
+The [full verification record](docs/verification/build-020.md) includes all three
+artifact checksums, fixture scope, and reproducible runtime commands.
 
-Final artifact SHA-256:
+Pinned server: Paper 26.2 STABLE build 84 (`Paper-26.2.jar`), SHA-256
+`defe82c1c89067186895de34cf32983e9f5a2ea387cfe7597c020faebb98ca16`.
 
-```text
-b2c55799ba63e7c7885eb568ff38e0a4d375f697857cb16fdd1e5ec3a26825f5  1MB-BookExport-v2.0.2-019-j25-26.2.jar
-```
+Main artifact SHA-256: `b7f8ac362d80332dfe1369361d9a82f9c9ef3af967a9f94596304071d8cfc38f`.
 
-This automated and console verification does not replace the repository's in-game beta review.
+The [build 019 verification record](docs/verification/build-019.md) preserves the original runtime versions and results. <!-- release-metadata-history -->
 
 For runtime validation, use the repository's [beta tester checklist](https://github.com/mrfdev/1MB-CMI-BookExport/blob/master/checklist-bookexport.md). Planned hardening and feature ideas remain in the source repository's [feature backlog](https://github.com/mrfdev/1MB-CMI-BookExport/blob/master/feature-improvements-bookexport.md); neither project-management file is copied into the central player-documentation namespace.
 

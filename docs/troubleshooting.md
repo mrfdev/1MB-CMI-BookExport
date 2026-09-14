@@ -24,7 +24,7 @@ and Java releases are not supported. Install the plugin only on Paper 26.2
 ### Paper discovers BookExport twice
 
 Stop Paper and leave exactly one BookExport main JAR in `plugins/`. Do not install
-the source or Javadoc JAR, and do not keep build 019 beside an older plugin JAR.
+the source or Javadoc JAR, and do not keep build 020 beside an older plugin JAR.
 Restart cleanly; do not use `/reload` or a hot-reload plugin.
 
 ### BookExport disables itself because configuration is invalid

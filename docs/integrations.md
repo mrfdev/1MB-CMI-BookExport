@@ -10,14 +10,14 @@ do not control whether BookExport loads.
 | Component | Relationship | Verified target or tested version |
 | --- | --- | --- |
 | Paper | Required server and production API | Paper 26.2 `STABLE` build 84; compile API `26.2.build.84-stable` |
-| Java | Required runtime and bytecode target | Java 25 class files; Oracle Java 25.0.4 and 26.0.2 smoke-tested |
-| CMI | Optional consumer of published CustomText files | CMI 9.8.8.5 tested |
+| Java | Required runtime and bytecode target | Java 25 class files; Oracle Java 25.0.4.1 and 26.0.2.1 smoke-tested |
+| CMI | Optional consumer of published CustomText files | CMI 9.8.9.9 tested |
 | CMILib | CMI's dependency, not BookExport's dependency | CMILib 1.5.9.9 tested alongside CMI |
 | PlaceholderAPI | Optional resolver used by CMI or other display plugins; no BookExport expansion | PlaceholderAPI 2.12.3 tested alongside CMI |
-| LuckPerms | Optional Bukkit permission provider | LuckPerms 5.5.59 tested |
+| LuckPerms | Optional Bukkit permission provider | LuckPerms 5.5.81 tested |
 | Vault | No BookExport relationship | The tested server's CMI-flavored Vault artifact reported manifest version `1.7.3-CMI`; BookExport did not use it |
 
-The optional-plugin versions above describe the stack exercised on 2026-07-28.
+The optional-plugin versions above describe the stack exercised on 2026-09-15.
 They are not declared minimum dependencies and are not bundled into the BookExport
 JAR.
 

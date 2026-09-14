@@ -4,16 +4,17 @@ Use this checklist for an in-game review on the dedicated Paper 26.2 BookExport 
 
 ## Automated baseline already completed
 
-- [x] Build 019 source coverage includes the durable publication journal, exact precomputed publication plans, recovery reconciliation, scoped publication blocking, fault injection at every publication boundary, and content-privacy sentinels.
-- [x] Build 019 uses Oracle JDK 25.0.4 with Java 25 class files and the exact stable compile API `26.2.build.84-stable`.
-- [x] Build 019 completed `./gradlew clean build --warning-mode all` with 253 tests: 251 passed, zero failures/errors, and two expected case-variant skips on case-insensitive APFS.
-- [x] The release drift gate validates generated resources, plugin descriptor, JAR manifest, all three release JARs, Java class-file major version 69, and semantic/build/JDK/Paper/artifact metadata across every maintained documentation page.
-- [x] Paper 26.2 `STABLE` build 84 is installed as `Paper-26.2.jar`; PaperScript's saved and installed SHA-256 values match.
-- [x] Build 019 is smoke-tested on Oracle Java 25.0.4 and 26.0.2 with CMI 9.8.8.5 and CMILib 1.5.9.9.
-- [x] Build 019 live console checks cover clean enable/disable, `/bookexport info`, `/bookexport version`, `/bookexport status`, permission-filtered help, admin/workflow status, clear recovery diagnostics, and shutdown without a BookExport warning, error, exception, or deprecated-API message.
-- [x] The only smoke-test JVM warnings were attributed to Paper-bundled JOML (`sun.misc.Unsafe::objectFieldOffset`, both runtimes) and LuckPerms-bundled Commodore (final-field mutation, Java 26 only), not BookExport.
-- [x] Packaged JAR SHA-256: `b2c55799ba63e7c7885eb568ff38e0a4d375f697857cb16fdd1e5ec3a26825f5`.
-- [x] Automated tests cover review decisions, checksum invalidation and reapproval, legacy publication, history, incomplete creation, malformed sidecars, and corrupt-draft history isolation. Earlier disposable integration testing confirmed that fixture content stayed out of logs and manifests, manifest sidecars stayed out of CMI, and fixtures were removed.
+- [x] Build 020 compiles with Oracle JDK 25.0.4.1, Java 25 class files, and Paper API `26.2.build.84-stable`.
+- [x] JUnit on Oracle Java 25.0.4.1 and 26.0.2.1: 253 tests per runtime, 251 passed, zero failures/errors, two expected case-variant skips on case-insensitive APFS.
+- [x] All 76 plugin classes use major version 69 without preview features; all three JARs pass archive integrity checks.
+- [x] Canonical `./gradlew clean build --warning-mode all` and the separate `testJava26` task passed.
+- [x] Paper 26.2 build 84 loaded BookExport, CMI 9.8.9.9, CMILib 1.5.9.9, LuckPerms 5.5.81, PlaceholderAPI 2.12.3, and Vault 1.7.3-CMI on both JDKs.
+- [x] Console checks cover metadata aliases, status/help, CMI/workflow diagnostics, legacy draft adoption/approval, collision rejection, unique publication, replacement with backup, history, reload, and clear recovery.
+- [x] Each runtime verified three exact-byte archives, one exact-byte replacement backup, content-free logs/manifests, clean shutdown, and a restart that changed no workflow file bytes or modification timestamps.
+- [x] No BookExport warnings/errors; third-party warnings are recorded in the [build 020 report](docs/verification/build-020.md).
+- [x] Main JAR SHA-256: `b7f8ac362d80332dfe1369361d9a82f9c9ef3af967a9f94596304071d8cfc38f`.
+
+The [original build 019 baseline](docs/verification/build-019.md) is retained as history. <!-- release-metadata-history -->
 
 The remaining unchecked items require an actual player/client, permission-group
 testing or deliberate operator verification. The
@@ -39,10 +40,10 @@ to force-kill the server.
 ## Before connecting
 
 - [ ] An administrator confirms the newest BookExport JAR is installed and older copies are removed.
-- [ ] The installed artifact is `1MB-BookExport-v2.0.2-019-j25-26.2.jar`.
-- [ ] `/version BookExport` reports `2.0.2`; `/bookexport info` and `/bookexport version` report build `019`, exact API `26.2.build.84-stable`, and a clickable canonical docs link.
+- [ ] The installed artifact is `1MB-BookExport-v2.0.2-020-j25-26.2.jar`.
+- [ ] `/version BookExport` reports `2.0.2`; `/bookexport info` and `/bookexport version` report build `020`, exact API `26.2.build.84-stable`, and a clickable canonical docs link.
 - [ ] `/version` reports Paper 26.2 stable build 84.
-- [ ] The server runtime reports Java 25 or newer (record the exact version above) and the plugin reports Java target 25; automated startup coverage used Java 25.0.4 and 26.0.2.
+- [ ] The server runtime reports Java 25 or newer (record the exact version above) and the plugin reports Java target 25; automated startup coverage used Java 25.0.4.1 and 26.0.2.1.
 - [ ] A fresh `config.yml` reports config version 3 and workflow `staged`.
 - [ ] The staging, published, archive, backup, and fixed internal transaction directories exist, are writable, are distinct, and do not contain one another.
 - [ ] BookExport, CMI, CMILib, LuckPerms, and PlaceholderAPI are green in `/plugins`.

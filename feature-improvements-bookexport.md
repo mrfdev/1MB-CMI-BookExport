@@ -5,7 +5,7 @@ This document separates completed 2.0 modernization work from proposed follow-up
 ## Completed for the 2.0.2 compatibility cycle
 
 - [x] Target Java 25 and the exact stable Paper API `26.2.build.84-stable`.
-- [x] Test runtime compatibility with installed Oracle Java 25.0.4 and 26.0.2.
+- [x] Test runtime compatibility with installed Oracle Java 25.0.4.1 and 26.0.2.1.
 - [x] Remove deprecated Bungee chat, `ChatColor`, and written-book string APIs.
 - [x] Read written-book Adventure components and writable-book strings through the correct material-specific APIs.
 - [x] Remove the blanket deprecation suppression and treat all compiler warnings as errors.
@@ -57,7 +57,8 @@ This document separates completed 2.0 modernization work from proposed follow-up
 - [x] Add sentinel privacy tests proving malformed journal input, scanner findings, exceptions, and object text do not leak book content or absolute workflow paths.
 - [x] Pass the build 017 release gate with 165 tests (163 passed and two filesystem-specific skips), Java class-file major version 69, and a Paper 26.2 build 60 console smoke test; retain it as the pre-journal baseline. <!-- release-metadata-history -->
 - [x] Pass the build 018 gate with 250 tests (248 passed and two filesystem-specific skips), SHA-256 `8dc385aeebecef356b6939c088e5e9a4daeb4cfeead7bd0797007ca20cfefe25`, Java class-file major version 69, the expanded descriptor, and a clean Paper 26.2 build 60 console smoke test. <!-- release-metadata-history -->
-- [x] Pass the build 019 release gate with 253 tests (251 passed and two filesystem-specific skips), SHA-256 `b2c55799ba63e7c7885eb568ff38e0a4d375f697857cb16fdd1e5ec3a26825f5`, Java class-file major version 69, the exact stable Paper API, generated release metadata, command aliases, and build-breaking artifact/documentation drift checks.
+- [x] Pass the build 019 release gate with 253 tests (251 passed and two filesystem-specific skips), SHA-256 `b2c55799ba63e7c7885eb568ff38e0a4d375f697857cb16fdd1e5ec3a26825f5`, Java class-file major version 69, the exact stable Paper API, generated release metadata, command aliases, and build-breaking artifact/documentation drift checks. <!-- release-metadata-history -->
+- [x] Pass the build 020 release gate with JDK 25.0.4.1, complete JUnit suites on Java 25.0.4.1 and 26.0.2.1 (253 tests each, 251 passed and two filesystem-specific skips), and SHA-256 `b7f8ac362d80332dfe1369361d9a82f9c9ef3af967a9f94596304071d8cfc38f`; the canonical full rebuild, metadata gate, both Paper smoke suites, and clean restarts passed.
 - [x] Rewrite the README and create an in-game beta checklist.
 
 ## Beta priorities
@@ -68,7 +69,8 @@ This document separates completed 2.0 modernization work from proposed follow-up
 - [ ] Prepare repeatable fixture books: one-page, three-page, Unicode, formatted, placeholder, malformed-color, empty-page, and near-limit books.
 - [ ] Decide how player-authored CMI markup should be governed. Current behavior intentionally preserves it and therefore requires trusted export permissions.
 - [ ] Validate the production policy for existing CMI text: default `fail`, deliberate `unique`, or separately authorized backed-up `replace`.
-- [x] Smoke-test CMI 9.8.8.5 and CMILib 1.5.9.9 startup stability on Paper 26.2 stable build 84 under Java 25.0.4 and 26.0.2; in-game behavior remains covered by the beta checklist.
+- [x] Smoke-test CMI 9.8.8.5 and CMILib 1.5.9.9 startup stability on Paper 26.2 stable build 84 under Java 25.0.4 and 26.0.2; in-game behavior remains covered by the beta checklist. <!-- release-metadata-history -->
+- [x] Reverify CMI 9.8.9.9 and CMILib 1.5.9.9 with build 020 on Oracle Java 25.0.4.1 and 26.0.2.1, including publication, backup, restart, and shutdown checks; player/client behavior remains covered by the beta checklist.
 
 ### P1: publishing workflow follow-ups
 

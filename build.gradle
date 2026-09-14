@@ -6,7 +6,7 @@ def pluginName = 'BookExport'
 def artifactBaseName = '1MB-BookExport'
 def pluginVersion = '2.0.2'
 // Monotonic BookExport release build; it is intentionally independent of Git commit count.
-def buildNumber = '019'
+def buildNumber = '020'
 def javaTarget = 25
 def paperTarget = '26.2'
 def paperApiVersion = '26.2.build.84-stable'
@@ -14,8 +14,8 @@ def paperBuild = '84'
 def paperChannel = 'STABLE'
 def paperServerJarFileName = "Paper-${paperTarget}.jar"
 def paperServerSha256 = 'defe82c1c89067186895de34cf32983e9f5a2ea387cfe7597c020faebb98ca16'
-def buildJdkVersion = '25.0.4'
-def compatibilityJdkVersion = '26.0.2'
+def buildJdkVersion = '25.0.4.1'
+def compatibilityJdkVersion = '26.0.2.1'
 def adventureVersion = '5.2.0'
 def junitVersion = '6.1.0'
 def docsUrl = 'https://docs.1moreblock.com/custom-server-plugins/bookexport/'
@@ -92,12 +92,27 @@ tasks.processResources {
     }
 }
 
-tasks.test {
+tasks.withType(Test).configureEach {
     useJUnitPlatform()
+    doFirst {
+        def runtime = javaLauncher.get().metadata
+        logger.lifecycle("${name} JVM: ${runtime.javaRuntimeVersion} (${runtime.installationPath})")
+    }
     testLogging {
         events 'failed', 'skipped'
         exceptionFormat = 'full'
     }
+}
+
+tasks.register('testJava26', Test) {
+    group = 'verification'
+    description = 'Runs the complete test suite on Java 26 using the Java 25 compiled classes.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(26)
+    }
+    shouldRunAfter tasks.named('test')
 }
 
 tasks.withType(Jar).configureEach {
@@ -137,6 +152,7 @@ tasks.register('printBuildConfig') {
         println "  Paper jar: ${paperServerJarFileName}"
         println "  Build JDK: ${buildJdkVersion}"
         println "  Compatibility runtime: ${compatibilityJdkVersion}"
+        println "  Compiler runtime: ${tasks.named('compileJava', JavaCompile).get().javaCompiler.get().metadata.javaRuntimeVersion}"
     }
 }
 
@@ -280,7 +296,7 @@ tasks.register('verifyReleaseMetadata') {
         def artifactPattern =
                 ~/1MB-BookExport-v\d+\.\d+\.\d+-\d{3}-j\d+-[\d.]+(?:-(?:sources|javadoc))?\.jar/
         def paperApiPattern = ~/(?i)\b\d+\.\d+\.build\.\d+-(?:alpha|beta|stable)\b/
-        def jdkPatchPattern = ~/(?<![\d.])(?:25\.0\.\d+|26\.0\.\d+)(?![\d.])/
+        def jdkPatchPattern = ~/(?<![\d.])(?:25|26)\.0\.\d+(?:\.\d+)?(?![\d.])/
         def releaseBuildPattern = ~/(?i)\b(?:release\s+)?build(?:\s+|:\s*)[`"'#]?(\d{3})\b/
         def paperTargetPattern = ~/(?i)\bPaper(?:\s+API)?\s+(\d+\.\d+(?:\.\d+)?)\b/
         def structuredPaperTargetPattern = ~/(?i)^\s*paper_target:\s*["']?(\d+\.\d+(?:\.\d+)?)\b/
